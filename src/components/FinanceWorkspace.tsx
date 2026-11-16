@@ -95,12 +95,19 @@ export function FinanceWorkspace({
     saveUsername,
     clearUsername,
   } = useUsername();
+  const [usernameFilter, setUsernameFilter] = useState<string>("all");
+  const [hasManualUsernameFilter, setHasManualUsernameFilter] = useState(false);
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [usernameModalReason, setUsernameModalReason] = useState<string | null>(
     null
   );
   const [pendingManualAfterUsername, setPendingManualAfterUsername] =
     useState(false);
+
+  useEffect(() => {
+    if (!isUsernameLoaded || hasManualUsernameFilter) return;
+    setUsernameFilter(hasUsername ? username : "all");
+  }, [isUsernameLoaded, hasUsername, username, hasManualUsernameFilter]);
 
   // Modals
   const [manualModalOpen, setManualModalOpen] = useState(false);
@@ -259,6 +266,31 @@ export function FinanceWorkspace({
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [transactions]);
 
+  const { usernameOptions, hasUnassignedTransactions } = useMemo(() => {
+    const map = new Map<string, string>();
+    if (username.trim()) {
+      map.set(username.trim().toLowerCase(), username.trim());
+    }
+    let hasUnassigned = false;
+    for (const tx of transactions) {
+      const name = tx.username?.trim();
+      if (!name) {
+        hasUnassigned = true;
+        continue;
+      }
+      const key = name.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, name);
+      }
+    }
+    return {
+      usernameOptions: Array.from(map.values()).sort((a, b) =>
+        a.localeCompare(b, "id")
+      ),
+      hasUnassignedTransactions: hasUnassigned,
+    };
+  }, [transactions, username]);
+
   const periodTransactions = useMemo(() => {
     if (selectedMonth === "all") return transactions;
     return transactions.filter((tx) => tx.date.startsWith(selectedMonth));
@@ -266,6 +298,16 @@ export function FinanceWorkspace({
 
   const visibleTransactions = useMemo(() => {
     return periodTransactions.filter((tx) => {
+      if (usernameFilter === "__unassigned__") {
+        if (tx.username && tx.username.trim().length > 0) return false;
+      } else if (usernameFilter !== "all") {
+        if (
+          (tx.username ?? "").trim().toLowerCase() !==
+          usernameFilter.trim().toLowerCase()
+        ) {
+          return false;
+        }
+      }
       if (typeFilter !== "all" && tx.type !== typeFilter) return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.trim().toLowerCase();
@@ -280,7 +322,7 @@ export function FinanceWorkspace({
         (tx.items ?? []).some((i) => i.name.toLowerCase().includes(q))
       );
     });
-  }, [periodTransactions, typeFilter, searchQuery]);
+  }, [periodTransactions, usernameFilter, typeFilter, searchQuery]);
 
   const { totalIncome, totalExpense, netBalance } = useMemo(() => {
     let income = 0;
@@ -730,7 +772,7 @@ export function FinanceWorkspace({
                 aria-label="Daftar Transaksi Keuangan"
                 className="bg-white border border-slate-200 rounded-xl overflow-hidden"
               >
-                <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3.5">
+                <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5">
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">
                       Catatan Pemasukan & Pengeluaran
@@ -738,11 +780,47 @@ export function FinanceWorkspace({
                     <p className="text-xs text-slate-500 mt-0.5">
                       {activePeriodLabel}
                       <span className="mx-1.5" aria-hidden="true">·</span>
+                      {usernameFilter === "all"
+                        ? "Semua Username"
+                        : usernameFilter === "__unassigned__"
+                        ? "Tanpa Username"
+                        : `Username: ${usernameFilter}`}
+                      <span className="mx-1.5" aria-hidden="true">·</span>
                       {visibleTransactions.length} entri ditampilkan
                     </p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+                  <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3">
+                    {/* Username Filter */}
+                    <div className="relative">
+                      <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <label htmlFor="ledger-username-filter" className="sr-only">
+                        Filter berdasarkan username
+                      </label>
+                      <select
+                        id="ledger-username-filter"
+                        value={usernameFilter}
+                        onChange={(e) => {
+                          setHasManualUsernameFilter(true);
+                          setUsernameFilter(e.target.value);
+                        }}
+                        className="w-full sm:w-48 min-h-[42px] sm:min-h-[36px] pl-8 pr-3 py-1.5 text-base sm:text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                      >
+                        <option value="all">Semua Username</option>
+                        {usernameOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {username &&
+                            name.toLowerCase() === username.trim().toLowerCase()
+                              ? `${name} (Saya)`
+                              : name}
+                          </option>
+                        ))}
+                        {hasUnassignedTransactions && (
+                          <option value="__unassigned__">Tanpa Username</option>
+                        )}
+                      </select>
+                    </div>
+
                     {/* Search Input */}
                     <div className="relative">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -751,7 +829,7 @@ export function FinanceWorkspace({
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Cari toko, barang, kategori..."
-                        className="w-full sm:w-60 min-h-[42px] sm:min-h-[36px] pl-9 pr-3 py-1.5 text-base sm:text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                        className="w-full sm:w-56 min-h-[42px] sm:min-h-[36px] pl-9 pr-3 py-1.5 text-base sm:text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
                       />
                     </div>
 
@@ -793,17 +871,41 @@ export function FinanceWorkspace({
                       <ReceiptText className="w-5 h-5" />
                     </div>
                     <h3 className="text-sm font-semibold text-slate-900 mt-4">
-                      {transactions.length > 0 && selectedMonth !== "all"
+                      {usernameFilter !== "all" && periodTransactions.length > 0
+                        ? `Tidak Ada Transaksi untuk ${
+                            usernameFilter === "__unassigned__"
+                              ? "Tanpa Username"
+                              : `Username "${usernameFilter}"`
+                          }`
+                        : transactions.length > 0 && selectedMonth !== "all"
                         ? `Tidak Ada Transaksi pada ${activePeriodLabel}`
                         : "Belum Ada Catatan Keuangan"}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                      {transactions.length > 0 && selectedMonth !== "all"
+                      {usernameFilter !== "all" && periodTransactions.length > 0
+                        ? `Terdapat ${periodTransactions.length} transaksi di periode ini dari pencatat lain. Anda dapat menampilkan semua username untuk melihatnya.`
+                        : transactions.length > 0 && selectedMonth !== "all"
                         ? `Terdapat ${transactions.length} transaksi tersimpan di periode lain. Tampilkan semua periode untuk melihat seluruh riwayat.`
                         : "Mulai catat pemasukan dan pengeluaran Anda secara manual atau foto nota belanja untuk mengekstrak daftar barang otomatis."}
                     </p>
                     <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3">
-                      {transactions.length > 0 && selectedMonth !== "all" && (
+                      {usernameFilter !== "all" && periodTransactions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHasManualUsernameFilter(true);
+                            setUsernameFilter("all");
+                            setTypeFilter("all");
+                            setSearchQuery("");
+                          }}
+                          className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Tampilkan Semua Username ({periodTransactions.length})
+                        </button>
+                      )}
+                      {transactions.length > 0 &&
+                        selectedMonth !== "all" &&
+                        !(usernameFilter !== "all" && periodTransactions.length > 0) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -820,7 +922,8 @@ export function FinanceWorkspace({
                         type="button"
                         onClick={() => setActiveTab("scanner")}
                         className={`min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                          transactions.length > 0 && selectedMonth !== "all"
+                          (usernameFilter !== "all" && periodTransactions.length > 0) ||
+                          (transactions.length > 0 && selectedMonth !== "all")
                             ? "text-slate-700 bg-white border border-slate-300 hover:bg-slate-50"
                             : "text-white bg-teal-700 hover:bg-teal-800"
                         }`}
@@ -1215,7 +1318,9 @@ export function FinanceWorkspace({
           setPendingManualAfterUsername(false);
         }}
         onSave={(nextName) => {
-          saveUsername(nextName);
+          const saved = saveUsername(nextName);
+          setHasManualUsernameFilter(false);
+          setUsernameFilter(saved || "all");
           setUsernameModalOpen(false);
           setUsernameModalReason(null);
           if (pendingManualAfterUsername) {
@@ -1225,6 +1330,8 @@ export function FinanceWorkspace({
         }}
         onClear={() => {
           clearUsername();
+          setHasManualUsernameFilter(false);
+          setUsernameFilter("all");
           setPendingManualAfterUsername(false);
         }}
       />
