@@ -37,6 +37,14 @@ export function ReceiptDetailModal({
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 truncate">
               {formatDateID(transaction.date)}
+              {transaction.username && (
+                <>
+                  <span className="mx-1.5" aria-hidden="true">·</span>
+                  <span className="text-slate-700 font-medium">
+                    Oleh: {transaction.username}
+                  </span>
+                </>
+              )}
               {transaction.sourcePlatform && (
                 <>
                   <span className="mx-1.5" aria-hidden="true">·</span>

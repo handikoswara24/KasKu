@@ -16,6 +16,7 @@ const LOCAL_STORE_PATH = path.join("/tmp", "kasku-transactions.json");
 interface MongoTransactionDoc {
   _id?: ObjectId;
   id?: string;
+  username?: string;
   type: "income" | "expense";
   title: string;
   merchantName?: string;
@@ -64,6 +65,7 @@ function sanitizeRemoteImageUrl(url?: string): string | undefined {
 function serializeMongoDoc(doc: WithId<MongoTransactionDoc>): TransactionRecord {
   return {
     id: doc._id.toHexString(),
+    username: doc.username,
     type: doc.type,
     title: doc.title,
     merchantName: doc.merchantName,
@@ -143,6 +145,7 @@ export async function listTransactions(filters?: {
     records = records.filter(
       (item) =>
         item.title.toLowerCase().includes(q) ||
+        (item.username ?? "").toLowerCase().includes(q) ||
         (item.merchantName ?? "").toLowerCase().includes(q) ||
         (item.sourcePlatform ?? "").toLowerCase().includes(q) ||
         (item.serviceLabel ?? "").toLowerCase().includes(q) ||
@@ -160,6 +163,7 @@ export async function createTransaction(
 ): Promise<{ transaction: TransactionRecord; storageMode: StorageMode }> {
   const now = new Date().toISOString();
   const baseDoc: Omit<MongoTransactionDoc, "_id"> = {
+    username: input.username?.trim() || undefined,
     type: input.type,
     title: input.title.trim(),
     merchantName: input.merchantName?.trim() || undefined,
@@ -244,6 +248,7 @@ export async function updateTransaction(
     }
     const collection = await getMongoCollection();
     const $set: Record<string, unknown> = { updatedAt: now };
+    if (updates.username !== undefined) $set.username = updates.username.trim() || undefined;
     if (updates.type) $set.type = updates.type;
     if (updates.title !== undefined) $set.title = updates.title.trim();
     if (updates.merchantName !== undefined) $set.merchantName = updates.merchantName.trim();

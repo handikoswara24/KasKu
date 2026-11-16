@@ -158,10 +158,11 @@ export function exportFinanceReportPDF(options: ExportPdfOptions): void {
       const platformTag = tx.sourcePlatform
         ? `[${tx.sourcePlatform}${tx.serviceLabel ? ` · ${tx.serviceLabel}` : ""}] `
         : "";
+      const actorTag = tx.username ? `\nOleh: ${tx.username}` : "";
 
       return [
         formatDateID(tx.date),
-        `${platformTag}${merchantPrefix}${itemsText}`,
+        `${platformTag}${merchantPrefix}${actorTag}${itemsText}`,
         `${tx.category}\n${tx.paymentMethod}`,
         tx.type === "income" ? "Pemasukan" : "Pengeluaran",
         `${tx.type === "income" ? "+" : "-"} ${formatIDR(tx.amount)}`,

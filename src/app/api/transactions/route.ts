@@ -36,6 +36,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<CreateTransactionInput>;
 
+    if (!body.username || typeof body.username !== "string" || !body.username.trim()) {
+      return NextResponse.json(
+        { error: "Username pencatat wajib diisi sebelum mencatat transaksi." },
+        { status: 400 }
+      );
+    }
+
     if (body.type !== "income" && body.type !== "expense") {
       return NextResponse.json(
         { error: "Tipe transaksi harus 'income' atau 'expense'." },
@@ -93,6 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload: CreateTransactionInput = {
+      username: body.username.trim(),
       type: body.type,
       title: body.title.trim(),
       merchantName: body.merchantName?.trim(),

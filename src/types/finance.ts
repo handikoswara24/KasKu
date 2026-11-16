@@ -78,6 +78,7 @@ export interface ReceiptItem {
 
 export interface TransactionRecord {
   id: string;
+  username?: string;
   type: TransactionType;
   title: string;
   merchantName?: string;
@@ -98,6 +99,7 @@ export interface TransactionRecord {
 }
 
 export interface CreateTransactionInput {
+  username?: string;
   type: TransactionType;
   title: string;
   merchantName?: string;
