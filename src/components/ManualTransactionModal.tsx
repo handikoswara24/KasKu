@@ -110,33 +110,37 @@ export function ManualTransactionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/50 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="manual-tx-title"
     >
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-t-2xl sm:rounded-xl shadow-xl overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="sm:hidden pt-2.5 flex justify-center">
+          <span className="w-10 h-1 rounded-full bg-slate-300" aria-hidden="true" />
+        </div>
+
+        <div className="px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 flex items-center justify-between gap-4 shrink-0">
           <h2 id="manual-tx-title" className="text-base font-semibold text-slate-900">
             {initialRecord ? "Edit Transaksi" : "Catat Transaksi Keuangan"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            className="min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
             aria-label="Tutup dialog"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleFormSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto">
           {/* Segmented Type Selector */}
           <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
             <button
               type="button"
               onClick={() => handleTypeSwitch("expense")}
-              className={`py-2 text-xs font-medium rounded-md transition-colors ${
+              className={`min-h-[40px] py-2 text-xs font-medium rounded-md transition-colors ${
                 type === "expense"
                   ? "bg-white text-rose-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -147,7 +151,7 @@ export function ManualTransactionModal({
             <button
               type="button"
               onClick={() => handleTypeSwitch("income")}
-              className={`py-2 text-xs font-medium rounded-md transition-colors ${
+              className={`min-h-[40px] py-2 text-xs font-medium rounded-md transition-colors ${
                 type === "income"
                   ? "bg-white text-emerald-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -171,7 +175,7 @@ export function ManualTransactionModal({
                   ? "Contoh: Gaji Bulanan, Proyek Desain"
                   : "Contoh: Makan Siang, Bayar Listrik"
               }
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+              className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
             />
           </div>
 
@@ -182,12 +186,13 @@ export function ManualTransactionModal({
               </label>
               <input
                 type="number"
+                inputMode="numeric"
                 required
                 min={1}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="50000"
-                className="w-full px-3 py-2 text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
               />
             </div>
 
@@ -200,7 +205,7 @@ export function ManualTransactionModal({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
               />
             </div>
           </div>
@@ -213,7 +218,7 @@ export function ManualTransactionModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
@@ -230,7 +235,7 @@ export function ManualTransactionModal({
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
               >
                 {PAYMENT_METHODS.map((pm) => (
                   <option key={pm} value={pm}>
@@ -250,7 +255,7 @@ export function ManualTransactionModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Detail tambahan jika diperlukan"
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+              className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
             />
           </div>
 
@@ -263,20 +268,20 @@ export function ManualTransactionModal({
             </p>
           )}
 
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+          <div className="pt-3 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm sm:text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:bg-teal-700/60 rounded-lg transition-colors"
+              className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center gap-2 px-5 py-2 text-sm sm:text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:bg-teal-700/60 rounded-lg transition-colors"
             >
-              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {initialRecord ? "Simpan Perubahan" : "Simpan Transaksi"}
             </button>
           </div>

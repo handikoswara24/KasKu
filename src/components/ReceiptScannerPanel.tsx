@@ -26,11 +26,13 @@ import {
 } from "@/types/finance";
 
 interface ReceiptScannerPanelProps {
+  imagekitConfigured?: boolean;
   onSaveTransaction: (payload: CreateTransactionInput) => Promise<void>;
   onSavedSuccess?: () => void;
 }
 
 export function ReceiptScannerPanel({
+  imagekitConfigured = false,
   onSaveTransaction,
   onSavedSuccess,
 }: ReceiptScannerPanelProps) {
@@ -49,7 +51,6 @@ export function ReceiptScannerPanel({
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanCompleted, setScanCompleted] = useState(false);
 
-  // Editable receipt transaction state
   const [merchantName, setMerchantName] = useState("");
   const [date, setDate] = useState(getTodayDateISO());
   const [category, setCategory] = useState<string>("Belanja Harian");
@@ -61,8 +62,15 @@ export function ReceiptScannerPanel({
   const [notes, setNotes] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [saveReceiptToImageKit, setSaveReceiptToImageKit] = useState(
+    imagekitConfigured
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSaveReceiptToImageKit(imagekitConfigured);
+  }, [imagekitConfigured]);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -103,7 +111,7 @@ export function ReceiptScannerPanel({
       });
     } catch {
       setCameraError(
-        "Izin kamera tidak tersedia atau diblokir oleh iframe/browser. Gunakan tombol Unggah Foto Nota di samping."
+        "Izin kamera tidak tersedia atau diblokir oleh browser. Gunakan tombol Pilih Gambar Nota untuk memfoto atau mengunggah dari galeri."
       );
     }
   };
@@ -256,9 +264,10 @@ export function ReceiptScannerPanel({
 
     setIsSaving(true);
     try {
-      const compactThumb = previewDataUrl
-        ? await compressDataUrlImage(previewDataUrl, 720, 0.7)
-        : undefined;
+      const compactThumb =
+        saveReceiptToImageKit && previewDataUrl
+          ? await compressDataUrlImage(previewDataUrl, 1080, 0.78)
+          : undefined;
 
       await onSaveTransaction({
         type: "expense",
@@ -275,7 +284,11 @@ export function ReceiptScannerPanel({
         discount: discount > 0 ? discount : undefined,
       });
 
-      setSaveSuccessMsg("Pengeluaran beserta rincian barang dan pratinjau nota berhasil disimpan.");
+      setSaveSuccessMsg(
+        saveReceiptToImageKit
+          ? "Pengeluaran tersimpan ke MongoDB dan foto nota diunggah ke ImageKit."
+          : "Pengeluaran dan rincian barang berhasil disimpan ke database."
+      );
       setPreviewDataUrl(null);
       setItems([]);
       setMerchantName("");
@@ -297,11 +310,11 @@ export function ReceiptScannerPanel({
   const itemsSubtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {saveSuccessMsg && (
         <div
           role="status"
-          className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 text-sm flex items-center justify-between gap-4"
+          className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 text-sm flex items-center justify-between gap-3"
         >
           <span className="inline-flex items-center gap-2 font-medium">
             <Check className="w-4 h-4 text-emerald-700 shrink-0" />
@@ -310,7 +323,7 @@ export function ReceiptScannerPanel({
           <button
             type="button"
             onClick={() => setSaveSuccessMsg(null)}
-            className="text-emerald-700 hover:text-emerald-900 p-1"
+            className="min-w-[40px] min-h-[40px] flex items-center justify-center text-emerald-700 hover:text-emerald-900 shrink-0"
             aria-label="Tutup pemberitahuan"
           >
             <X className="w-4 h-4" />
@@ -318,16 +331,16 @@ export function ReceiptScannerPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* Left Column: Capture / Upload + Receipt Preview */}
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-6">
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-4 sm:p-6">
           <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-base font-semibold text-slate-900">
                 Foto & Pratinjau Nota
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Ambil foto struk belanja atau unggah gambar untuk pratinjau.
+                Ambil foto struk atau unggah gambar untuk pratinjau.
               </p>
             </div>
             {previewDataUrl && (
@@ -337,7 +350,7 @@ export function ReceiptScannerPanel({
                   setPreviewDataUrl(null);
                   setScanCompleted(false);
                 }}
-                className="text-xs font-medium text-slate-600 hover:text-rose-700 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 transition-colors whitespace-nowrap shrink-0"
+                className="min-h-[40px] text-xs font-medium text-slate-600 hover:text-rose-700 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 transition-colors whitespace-nowrap shrink-0"
               >
                 Ganti Foto
               </button>
@@ -359,7 +372,7 @@ export function ReceiptScannerPanel({
 
           {/* Camera Live Viewfinder */}
           {cameraOpen ? (
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 space-y-3">
               <div className="relative bg-slate-950 rounded-lg overflow-hidden aspect-[3/4] flex items-center justify-center">
                 <video
                   ref={videoRef}
@@ -368,26 +381,25 @@ export function ReceiptScannerPanel({
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="flex items-center gap-3">
+              <div className="grid grid-cols-3 gap-2.5">
                 <button
                   type="button"
                   onClick={handleCapturePhoto}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors"
+                  className="col-span-2 min-h-[48px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors"
                 >
                   <Camera className="w-4 h-4" />
-                  Ambil Foto Nota
+                  Ambil Foto
                 </button>
                 <button
                   type="button"
                   onClick={stopCamera}
-                  className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="min-h-[48px] px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                 >
                   Batal
                 </button>
               </div>
             </div>
           ) : !previewDataUrl ? (
-            /* Upload / Capture Dropzone */
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -395,7 +407,7 @@ export function ReceiptScannerPanel({
                 const file = e.dataTransfer.files?.[0];
                 void handleFileChange(file);
               }}
-              className="mt-5 border-2 border-dashed border-slate-300 hover:border-teal-600 rounded-xl p-8 text-center transition-colors bg-slate-50/70"
+              className="mt-4 border-2 border-dashed border-slate-300 hover:border-teal-600 rounded-xl p-6 sm:p-8 text-center transition-colors bg-slate-50/70"
             >
               <div className="w-11 h-11 rounded-lg bg-white border border-slate-200 flex items-center justify-center mx-auto text-teal-700">
                 <Upload className="w-5 h-5" />
@@ -404,24 +416,24 @@ export function ReceiptScannerPanel({
                 Unggah atau Foto Nota Belanja
               </h3>
               <p className="text-xs text-slate-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
-                Seret gambar ke area ini, pilih dari galeri, atau gunakan kamera langsung untuk membuat pratinjau nota.
+                Pilih dari galeri, seret gambar ke sini, atau gunakan kamera langsung untuk membuat pratinjau nota.
               </p>
 
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors whitespace-nowrap shrink-0"
+                  className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors whitespace-nowrap"
                 >
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload className="w-4 h-4" />
                   Pilih Gambar Nota
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenCamera}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors whitespace-nowrap shrink-0"
+                  className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors whitespace-nowrap"
                 >
-                  <Camera className="w-3.5 h-3.5" />
+                  <Camera className="w-4 h-4" />
                   Buka Kamera
                 </button>
               </div>
@@ -433,17 +445,18 @@ export function ReceiptScannerPanel({
               )}
             </div>
           ) : (
-            /* Active Receipt Preview Frame */
-            <div className="mt-5 space-y-4">
-              <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
                 <span className="text-xs font-medium text-slate-600">
                   Pratinjau Nota
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={() => setZoom((z) => Math.max(0.7, Number((z - 0.15).toFixed(2))))}
-                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded"
+                    onClick={() =>
+                      setZoom((z) => Math.max(0.7, Number((z - 0.15).toFixed(2))))
+                    }
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded"
                     aria-label="Perkecil pratinjau"
                   >
                     <ZoomOut className="w-4 h-4" />
@@ -453,8 +466,10 @@ export function ReceiptScannerPanel({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setZoom((z) => Math.min(2.2, Number((z + 0.15).toFixed(2))))}
-                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded"
+                    onClick={() =>
+                      setZoom((z) => Math.min(2.2, Number((z + 0.15).toFixed(2))))
+                    }
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded"
                     aria-label="Perbesar pratinjau"
                   >
                     <ZoomIn className="w-4 h-4" />
@@ -462,7 +477,7 @@ export function ReceiptScannerPanel({
                   <button
                     type="button"
                     onClick={() => setRotation((r) => (r + 90) % 360)}
-                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded ml-1"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded"
                     aria-label="Putar pratinjau 90 derajat"
                   >
                     <RotateCw className="w-4 h-4" />
@@ -470,12 +485,12 @@ export function ReceiptScannerPanel({
                 </div>
               </div>
 
-              <div className="relative bg-slate-900/5 border border-slate-200 rounded-lg overflow-auto max-h-[460px] flex items-center justify-center p-4">
+              <div className="relative bg-slate-900/5 border border-slate-200 rounded-lg overflow-auto max-h-[340px] sm:max-h-[460px] flex items-center justify-center p-3 sm:p-4">
                 <img
                   src={previewDataUrl}
                   alt="Pratinjau foto nota belanja"
                   referrerPolicy="no-referrer"
-                  className="max-w-full max-h-[420px] object-contain rounded shadow-sm transition-transform duration-150"
+                  className="max-w-full max-h-[300px] sm:max-h-[420px] object-contain rounded shadow-sm transition-transform duration-150"
                   style={{
                     transform: `scale(${zoom}) rotate(${rotation}deg)`,
                   }}
@@ -486,12 +501,12 @@ export function ReceiptScannerPanel({
                 type="button"
                 disabled={isScanning}
                 onClick={handleAnalyzeReceipt}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:bg-teal-700/60 rounded-lg transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:bg-teal-700/60 rounded-lg transition-colors"
               >
                 {isScanning ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Menganalisis Barang & Total Nota...
+                    Menganalisis Barang & Total...
                   </>
                 ) : (
                   <>
@@ -516,14 +531,14 @@ export function ReceiptScannerPanel({
         </div>
 
         {/* Right Column: Extracted Items, Type Suggestions & Save Form */}
-        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-6">
+        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-4 sm:p-6">
           <div className="pb-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
-                Rincian Barang, Saran Tipe & Total Pengeluaran
+                Rincian Barang, Saran Tipe & Total
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Periksa atau sesuaikan daftar barang hasil pemindaian sebelum disimpan ke buku kas.
+                Sesuaikan daftar barang hasil pemindaian sebelum disimpan ke buku kas.
               </p>
             </div>
             {scanCompleted && (
@@ -534,7 +549,7 @@ export function ReceiptScannerPanel({
           </div>
 
           {!previewDataUrl && items.length === 0 ? (
-            <div className="py-16 text-center max-w-md mx-auto">
+            <div className="py-12 sm:py-16 text-center max-w-md mx-auto">
               <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center mx-auto text-slate-500">
                 <ScanLine className="w-5 h-5" />
               </div>
@@ -542,18 +557,18 @@ export function ReceiptScannerPanel({
                 Belum Ada Nota Dipilih
               </h3>
               <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                Unggah atau ambil foto nota di panel sebelah kiri, lalu klik{" "}
+                Unggah atau ambil foto nota terlebih dahulu, lalu tekan{" "}
                 <strong className="text-slate-700 font-medium">
                   Analisis Nota & Beri Saran Tipe
                 </strong>{" "}
-                untuk mengekstrak daftar barang, saran tipe item, dan total pengeluarannya secara otomatis.
+                untuk membaca daftar barang, saran tipe, dan total pengeluarannya.
               </p>
             </div>
           ) : isScanning ? (
             <div className="py-8 space-y-4 animate-pulse">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="h-10 bg-slate-100 rounded-lg" />
-                <div className="h-10 bg-slate-100 rounded-lg" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="h-11 bg-slate-100 rounded-lg" />
+                <div className="h-11 bg-slate-100 rounded-lg" />
               </div>
               <div className="h-24 bg-slate-100 rounded-lg" />
               <div className="h-24 bg-slate-100 rounded-lg" />
@@ -561,7 +576,6 @@ export function ReceiptScannerPanel({
             </div>
           ) : (
             <form onSubmit={handleSaveReceiptExpense} className="mt-5 space-y-5">
-              {/* Merchant & Metadata Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1.5">
@@ -573,7 +587,7 @@ export function ReceiptScannerPanel({
                     value={merchantName}
                     onChange={(e) => setMerchantName(e.target.value)}
                     placeholder="Contoh: Indomaret, Kopi Kenangan"
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                    className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
                   />
                 </div>
 
@@ -586,7 +600,7 @@ export function ReceiptScannerPanel({
                     required
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                    className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
                   />
                 </div>
 
@@ -597,7 +611,7 @@ export function ReceiptScannerPanel({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                    className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
                   >
                     {EXPENSE_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -614,7 +628,7 @@ export function ReceiptScannerPanel({
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                    className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
                   >
                     {PAYMENT_METHODS.map((pm) => (
                       <option key={pm} value={pm}>
@@ -634,7 +648,7 @@ export function ReceiptScannerPanel({
                   <button
                     type="button"
                     onClick={handleAddEmptyItem}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 hover:text-teal-800 px-2.5 py-1 rounded-md hover:bg-teal-50 transition-colors"
+                    className="min-h-[40px] inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 hover:text-teal-800 px-3 py-1.5 rounded-md hover:bg-teal-50 transition-colors shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Tambah Barang
@@ -642,22 +656,22 @@ export function ReceiptScannerPanel({
                 </div>
 
                 {items.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
-                    Klik &ldquo;Analisis Nota & Beri Saran Tipe&rdquo; untuk membaca daftar barang otomatis, atau tambah barang secara manual.
+                  <p className="text-xs text-slate-500 py-4 px-3 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                    Tekan &ldquo;Analisis Nota & Beri Saran Tipe&rdquo; untuk membaca daftar barang otomatis, atau tambah manual.
                   </p>
                 ) : (
                   <div className="divide-y divide-slate-200 border border-slate-200 rounded-lg overflow-hidden">
                     {items.map((item, idx) => (
                       <div
                         key={item.id}
-                        className="p-3 bg-white hover:bg-slate-50/70 transition-colors space-y-2.5"
+                        className="p-3 sm:p-3.5 bg-white space-y-2.5"
                       >
-                        <div className="flex items-start gap-2.5">
-                          <span className="text-xs font-mono text-slate-400 pt-2 w-5 shrink-0">
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-mono text-slate-400 pt-2.5 w-5 shrink-0">
                             {idx + 1}.
                           </span>
-                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                            <div className="sm:col-span-6">
+                          <div className="flex-1 grid grid-cols-2 sm:grid-cols-12 gap-2">
+                            <div className="col-span-2 sm:col-span-6">
                               <label className="sr-only">Nama barang</label>
                               <input
                                 type="text"
@@ -666,13 +680,14 @@ export function ReceiptScannerPanel({
                                   updateItemField(item.id, "name", e.target.value)
                                 }
                                 placeholder="Nama barang"
-                                className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
+                                className="w-full min-h-[42px] px-2.5 py-1.5 text-base sm:text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
                               />
                             </div>
-                            <div className="sm:col-span-2">
+                            <div className="col-span-1 sm:col-span-2">
                               <label className="sr-only">Jumlah</label>
                               <input
                                 type="number"
+                                inputMode="numeric"
                                 min={1}
                                 value={item.quantity}
                                 onChange={(e) =>
@@ -682,14 +697,15 @@ export function ReceiptScannerPanel({
                                     Number(e.target.value)
                                   )
                                 }
-                                className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
+                                className="w-full min-h-[42px] px-2.5 py-1.5 text-base sm:text-sm font-mono tabular-nums border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
                                 title="Jumlah"
                               />
                             </div>
-                            <div className="sm:col-span-4">
+                            <div className="col-span-1 sm:col-span-4">
                               <label className="sr-only">Subtotal item</label>
                               <input
                                 type="number"
+                                inputMode="numeric"
                                 min={0}
                                 value={item.totalPrice}
                                 onChange={(e) =>
@@ -699,7 +715,7 @@ export function ReceiptScannerPanel({
                                     Number(e.target.value)
                                   )
                                 }
-                                className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums text-right border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
+                                className="w-full min-h-[42px] px-2.5 py-1.5 text-base sm:text-sm font-mono tabular-nums text-right border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
                                 title="Total harga item (Rp)"
                               />
                             </div>
@@ -707,15 +723,15 @@ export function ReceiptScannerPanel({
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-700 rounded transition-colors shrink-0"
+                            className="min-w-[42px] min-h-[42px] flex items-center justify-center text-slate-400 hover:text-rose-700 rounded-md hover:bg-rose-50 transition-colors shrink-0"
                             aria-label="Hapus barang"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
 
-                        <div className="pl-7 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                        <div className="pl-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-[11px] font-medium text-slate-500">
                               Saran Tipe:
                             </span>
@@ -728,7 +744,7 @@ export function ReceiptScannerPanel({
                                   e.target.value
                                 )
                               }
-                              className="text-xs font-medium text-teal-800 bg-teal-50/70 border border-teal-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                              className="min-h-[38px] text-xs font-medium text-teal-800 bg-teal-50/70 border border-teal-200 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-teal-600"
                             >
                               {ITEM_TYPE_SUGGESTIONS.map((t) => (
                                 <option key={t} value={t}>
@@ -763,7 +779,7 @@ export function ReceiptScannerPanel({
                     <label className="block text-[11px] font-medium text-slate-500 mb-1">
                       Subtotal Barang
                     </label>
-                    <div className="px-3 py-1.5 text-sm font-mono tabular-nums text-slate-700 bg-white border border-slate-200 rounded-lg">
+                    <div className="min-h-[42px] flex items-center px-3 py-1.5 text-sm font-mono tabular-nums text-slate-700 bg-white border border-slate-200 rounded-lg">
                       {formatIDR(itemsSubtotal)}
                     </div>
                   </div>
@@ -773,6 +789,7 @@ export function ReceiptScannerPanel({
                     </label>
                     <input
                       type="number"
+                      inputMode="numeric"
                       min={0}
                       value={taxOrService}
                       onChange={(e) => {
@@ -780,7 +797,7 @@ export function ReceiptScannerPanel({
                         setTaxOrService(val);
                         recalculateTotal(items, val, discount);
                       }}
-                      className="w-full px-3 py-1.5 text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                      className="w-full min-h-[42px] px-3 py-1.5 text-base sm:text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
                     />
                   </div>
                   <div>
@@ -789,6 +806,7 @@ export function ReceiptScannerPanel({
                     </label>
                     <input
                       type="number"
+                      inputMode="numeric"
                       min={0}
                       value={discount}
                       onChange={(e) => {
@@ -796,12 +814,12 @@ export function ReceiptScannerPanel({
                         setDiscount(val);
                         recalculateTotal(items, taxOrService, val);
                       }}
-                      className="w-full px-3 py-1.5 text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                      className="w-full min-h-[42px] px-3 py-1.5 text-base sm:text-sm font-mono tabular-nums bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
                     />
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                   <div>
                     <span className="text-xs font-semibold text-slate-800 block">
                       Total Pengeluaran Nota (Rp)
@@ -814,13 +832,14 @@ export function ReceiptScannerPanel({
                     <span className="text-xs font-mono text-slate-500">Rp</span>
                     <input
                       type="number"
+                      inputMode="numeric"
                       min={1}
                       required
                       value={totalAmount}
                       onChange={(e) =>
                         setTotalAmount(Math.max(0, Number(e.target.value) || 0))
                       }
-                      className="w-44 px-3 py-2 text-base font-mono font-semibold tabular-nums text-right text-rose-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                      className="w-full sm:w-44 min-h-[44px] px-3 py-2 text-base font-mono font-semibold tabular-nums text-right text-rose-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
                     />
                   </div>
                 </div>
@@ -835,9 +854,30 @@ export function ReceiptScannerPanel({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ringkasan belanja atau catatan pribadi"
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                  className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
                 />
               </div>
+
+              {previewDataUrl && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-1.5">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveReceiptToImageKit}
+                      onChange={(e) => setSaveReceiptToImageKit(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-teal-700 rounded"
+                    />
+                    <span className="text-xs font-medium text-slate-800">
+                      Simpan foto nota ke ImageKit (URL disimpan di MongoDB)
+                    </span>
+                  </label>
+                  {!imagekitConfigured && (
+                    <p className="text-[11px] text-amber-800 pl-6">
+                      IMAGEKIT_PRIVATE_KEY belum diatur di Secrets / Environment Variables. Aktifkan kunci ImageKit untuk menyimpan lampiran foto, atau nonaktifkan centang di atas untuk menyimpan rincian barang & total saja.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {saveError && (
                 <div
@@ -848,11 +888,11 @@ export function ReceiptScannerPanel({
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end pt-2">
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:bg-teal-700/60 rounded-lg transition-colors"
+                  className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:bg-teal-700/60 rounded-lg transition-colors"
                 >
                   {isSaving ? (
                     <>

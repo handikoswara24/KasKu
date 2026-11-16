@@ -17,21 +17,25 @@ export function ReceiptDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/50 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="receipt-detail-title"
     >
-      <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4 shrink-0">
-          <div>
+      <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-t-2xl sm:rounded-xl shadow-xl overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="sm:hidden pt-2.5 flex justify-center shrink-0">
+          <span className="w-10 h-1 rounded-full bg-slate-300" aria-hidden="true" />
+        </div>
+
+        <div className="px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 flex items-center justify-between gap-4 shrink-0">
+          <div className="min-w-0">
             <h2
               id="receipt-detail-title"
-              className="text-base font-semibold text-slate-900"
+              className="text-base font-semibold text-slate-900 truncate"
             >
               {transaction.merchantName || transaction.title}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
               {formatDateID(transaction.date)}
               <span className="mx-1.5" aria-hidden="true">·</span>
               {transaction.category}
@@ -42,14 +46,14 @@ export function ReceiptDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            className="min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
             aria-label="Tutup rincian nota"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="p-5 sm:p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Left: Stored Receipt Photo Preview */}
           <div className="md:col-span-5">
             <div className="text-xs font-medium text-slate-700 mb-2">
@@ -61,7 +65,7 @@ export function ReceiptDetailModal({
                   src={transaction.receiptPreviewUrl}
                   alt={`Foto nota ${transaction.title}`}
                   referrerPolicy="no-referrer"
-                  className="max-h-[420px] w-auto object-contain rounded"
+                  className="max-h-[320px] sm:max-h-[420px] w-auto object-contain rounded"
                 />
               </div>
             ) : (
@@ -82,35 +86,31 @@ export function ReceiptDetailModal({
               </h3>
 
               {transaction.items && transaction.items.length > 0 ? (
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500">
-                        <th className="py-2 px-3">Barang</th>
-                        <th className="py-2 px-3">Tipe</th>
-                        <th className="py-2 px-3 text-center">Qty</th>
-                        <th className="py-2 px-3 text-right">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
-                      {transaction.items.map((item) => (
-                        <tr key={item.id}>
-                          <td className="py-2.5 px-3 font-medium text-slate-800">
-                            {item.name}
-                          </td>
-                          <td className="py-2.5 px-3 text-teal-800">
+                <div className="border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100">
+                  {transaction.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 flex items-start justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900">
+                          {item.name}
+                        </div>
+                        <div className="text-slate-500 mt-0.5">
+                          <span className="text-teal-800 font-medium">
                             {item.suggestedType}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono tabular-nums text-slate-600">
-                            {item.quantity}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-900">
-                            {formatIDR(item.totalPrice)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </span>
+                          <span className="mx-1.5" aria-hidden="true">·</span>
+                          <span className="font-mono tabular-nums">
+                            {item.quantity}x
+                          </span>
+                        </div>
+                      </div>
+                      <div className="font-mono tabular-nums font-semibold text-slate-900 shrink-0">
+                        {formatIDR(item.totalPrice)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">

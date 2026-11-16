@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
   allowedDevOrigins,
   images: {
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "ik.imagekit.io",
+        pathname: "/**",
+      },
+    ],
   },
 };
 

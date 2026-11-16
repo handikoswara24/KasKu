@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { ObjectId, WithId } from "mongodb";
+import { deleteReceiptFromImageKit } from "@/lib/imagekit";
 import { getDatabase, isMongoConfigured } from "@/lib/mongodb";
 import {
   CreateTransactionInput,
@@ -25,6 +26,7 @@ interface MongoTransactionDoc {
   notes?: string;
   items?: TransactionRecord["items"];
   receiptPreviewUrl?: string;
+  receiptFileId?: string;
   taxOrService?: number;
   discount?: number;
   createdAt: string;
@@ -48,6 +50,15 @@ async function getMongoCollection() {
   return collection;
 }
 
+function sanitizeRemoteImageUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+    return trimmed;
+  }
+  return undefined;
+}
+
 function serializeMongoDoc(doc: WithId<MongoTransactionDoc>): TransactionRecord {
   return {
     id: doc._id.toHexString(),
@@ -61,6 +72,7 @@ function serializeMongoDoc(doc: WithId<MongoTransactionDoc>): TransactionRecord 
     notes: doc.notes,
     items: Array.isArray(doc.items) ? doc.items : undefined,
     receiptPreviewUrl: doc.receiptPreviewUrl,
+    receiptFileId: doc.receiptFileId,
     taxOrService: doc.taxOrService,
     discount: doc.discount,
     createdAt: doc.createdAt,
@@ -151,7 +163,8 @@ export async function createTransaction(
     paymentMethod: input.paymentMethod.trim() || "Lainnya",
     notes: input.notes?.trim() || undefined,
     items: input.items && input.items.length > 0 ? input.items : undefined,
-    receiptPreviewUrl: input.receiptPreviewUrl || undefined,
+    receiptPreviewUrl: sanitizeRemoteImageUrl(input.receiptPreviewUrl),
+    receiptFileId: input.receiptFileId?.trim() || undefined,
     taxOrService: input.taxOrService ? Math.round(input.taxOrService) : undefined,
     discount: input.discount ? Math.round(input.discount) : undefined,
     createdAt: now,
@@ -186,16 +199,28 @@ export async function deleteTransaction(
       return { deleted: false, storageMode: "mongodb" };
     }
     const collection = await getMongoCollection();
-    const res = await collection.deleteOne({ _id: new ObjectId(id) });
-    return { deleted: res.deletedCount > 0, storageMode: "mongodb" };
+    const removed = await collection.findOneAndDelete({
+      _id: new ObjectId(id),
+    });
+    if (!removed) {
+      return { deleted: false, storageMode: "mongodb" };
+    }
+    if (removed.receiptFileId) {
+      await deleteReceiptFromImageKit(removed.receiptFileId);
+    }
+    return { deleted: true, storageMode: "mongodb" };
   }
 
   const records = await readLocalStore();
-  const next = records.filter((r) => r.id !== id);
-  if (next.length === records.length) {
+  const target = records.find((r) => r.id === id);
+  if (!target) {
     return { deleted: false, storageMode: "local-fallback" };
   }
+  const next = records.filter((r) => r.id !== id);
   await writeLocalStore(next);
+  if (target.receiptFileId) {
+    await deleteReceiptFromImageKit(target.receiptFileId);
+  }
   return { deleted: true, storageMode: "local-fallback" };
 }
 
@@ -241,6 +266,10 @@ export async function updateTransaction(
   const nextRecord: TransactionRecord = {
     ...existing,
     ...updates,
+    receiptPreviewUrl:
+      updates.receiptPreviewUrl !== undefined
+        ? sanitizeRemoteImageUrl(updates.receiptPreviewUrl)
+        : existing.receiptPreviewUrl,
     amount:
       updates.amount !== undefined
         ? Math.max(0, Math.round(Number(updates.amount) || 0))

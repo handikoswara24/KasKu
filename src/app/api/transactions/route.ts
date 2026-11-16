@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isImageKitConfigured,
+  uploadReceiptToImageKit,
+} from "@/lib/imagekit";
 import { createTransaction, listTransactions } from "@/lib/transactions-store";
 import { CreateTransactionInput } from "@/types/finance";
 
@@ -12,7 +16,13 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") ?? undefined;
 
     const result = await listTransactions({ month, type, search });
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(
+      {
+        ...result,
+        imagekitConfigured: isImageKitConfigured(),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     const message =
       error instanceof Error
@@ -55,6 +65,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let receiptPreviewUrl: string | undefined;
+    let receiptFileId: string | undefined;
+
+    if (typeof body.receiptPreviewUrl === "string" && body.receiptPreviewUrl.trim()) {
+      const rawUrl = body.receiptPreviewUrl.trim();
+      if (rawUrl.startsWith("data:image/")) {
+        if (!isImageKitConfigured()) {
+          return NextResponse.json(
+            {
+              error:
+                "IMAGEKIT_PRIVATE_KEY belum dikonfigurasi pada Secrets / Environment Variables. Gambar nota hanya disimpan ke ImageKit (tidak ke MongoDB).",
+            },
+            { status: 503 }
+          );
+        }
+        const uploaded = await uploadReceiptToImageKit(
+          rawUrl,
+          body.merchantName || body.title
+        );
+        receiptPreviewUrl = uploaded.url;
+        receiptFileId = uploaded.fileId;
+      } else if (rawUrl.startsWith("https://") || rawUrl.startsWith("http://")) {
+        receiptPreviewUrl = rawUrl;
+        receiptFileId = body.receiptFileId?.trim() || undefined;
+      }
+    }
+
     const payload: CreateTransactionInput = {
       type: body.type,
       title: body.title.trim(),
@@ -65,18 +102,21 @@ export async function POST(request: NextRequest) {
       paymentMethod: body.paymentMethod?.trim() || "Lainnya",
       notes: body.notes?.trim(),
       items: Array.isArray(body.items) ? body.items : undefined,
-      receiptPreviewUrl:
-        typeof body.receiptPreviewUrl === "string" &&
-        body.receiptPreviewUrl.startsWith("data:image/")
-          ? body.receiptPreviewUrl
-          : undefined,
+      receiptPreviewUrl,
+      receiptFileId,
       taxOrService:
         body.taxOrService !== undefined ? Number(body.taxOrService) : undefined,
       discount: body.discount !== undefined ? Number(body.discount) : undefined,
     };
 
     const result = await createTransaction(payload);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(
+      {
+        ...result,
+        imagekitConfigured: isImageKitConfigured(),
+      },
+      { status: 201 }
+    );
   } catch (error) {
     const message =
       error instanceof Error

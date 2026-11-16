@@ -1,4 +1,6 @@
 import { FinanceWorkspace } from "@/components/FinanceWorkspace";
+import { getCurrentMonthKey } from "@/lib/format";
+import { isImageKitConfigured } from "@/lib/imagekit";
 import { listTransactions } from "@/lib/transactions-store";
 import { StorageMode, TransactionRecord } from "@/types/finance";
 
@@ -8,6 +10,8 @@ export default async function HomePage() {
   let initialTransactions: TransactionRecord[] = [];
   let initialStorageMode: StorageMode = "local-fallback";
   let initialError: string | null = null;
+  const currentMonthKey = getCurrentMonthKey();
+  const imagekitConfigured = isImageKitConfigured();
 
   try {
     const result = await listTransactions();
@@ -25,6 +29,8 @@ export default async function HomePage() {
       initialTransactions={initialTransactions}
       initialStorageMode={initialStorageMode}
       initialError={initialError}
+      currentMonthKey={currentMonthKey}
+      imagekitConfigured={imagekitConfigured}
     />
   );
 }

@@ -71,6 +71,7 @@ export interface TransactionRecord {
   notes?: string;
   items?: ReceiptItem[];
   receiptPreviewUrl?: string;
+  receiptFileId?: string;
   taxOrService?: number;
   discount?: number;
   createdAt: string;
@@ -88,6 +89,7 @@ export interface CreateTransactionInput {
   notes?: string;
   items?: ReceiptItem[];
   receiptPreviewUrl?: string;
+  receiptFileId?: string;
   taxOrService?: number;
   discount?: number;
 }
