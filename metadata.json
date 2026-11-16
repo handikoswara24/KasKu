@@ -1,0 +1,6 @@
+{
+  "name": "KasKu — Catatan Keuangan & Pemindai Nota",
+  "description": "Aplikasi pencatatan pemasukan dan pengeluaran pribadi berbasis Next.js dan MongoDB dengan pemindai nota AI, grafik ringkasan bulanan, dan ekspor laporan PDF.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
