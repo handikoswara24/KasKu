@@ -155,10 +155,13 @@ export function exportFinanceReportPDF(options: ExportPdfOptions): void {
         tx.merchantName && tx.merchantName !== tx.title
           ? `${tx.merchantName} — ${tx.title}`
           : tx.title;
+      const platformTag = tx.sourcePlatform
+        ? `[${tx.sourcePlatform}${tx.serviceLabel ? ` · ${tx.serviceLabel}` : ""}] `
+        : "";
 
       return [
         formatDateID(tx.date),
-        `${merchantPrefix}${itemsText}`,
+        `${platformTag}${merchantPrefix}${itemsText}`,
         `${tx.category}\n${tx.paymentMethod}`,
         tx.type === "income" ? "Pemasukan" : "Pengeluaran",
         `${tx.type === "income" ? "+" : "-"} ${formatIDR(tx.amount)}`,

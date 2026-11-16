@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   Camera,
   Check,
+  Image as ImageIcon,
   Loader2,
   Plus,
   RotateCw,
   ScanLine,
   Trash2,
-  Upload,
   X,
   ZoomIn,
   ZoomOut,
@@ -23,6 +23,7 @@ import {
   PAYMENT_METHODS,
   ReceiptItem,
   ReceiptScanResult,
+  SOURCE_PLATFORMS,
 } from "@/types/finance";
 
 interface ReceiptScannerPanelProps {
@@ -36,7 +37,8 @@ export function ReceiptScannerPanel({
   onSaveTransaction,
   onSavedSuccess,
 }: ReceiptScannerPanelProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraCaptureInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -51,6 +53,8 @@ export function ReceiptScannerPanel({
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanCompleted, setScanCompleted] = useState(false);
 
+  const [sourcePlatform, setSourcePlatform] = useState<string>("Struk Toko");
+  const [serviceLabel, setServiceLabel] = useState<string>("");
   const [merchantName, setMerchantName] = useState("");
   const [date, setDate] = useState(getTodayDateISO());
   const [category, setCategory] = useState<string>("Belanja Harian");
@@ -179,6 +183,8 @@ export function ReceiptScannerPanel({
         throw new Error(data.error || "Gagal menganalisis foto nota.");
       }
 
+      setSourcePlatform(data.sourcePlatform || "Struk Toko");
+      setServiceLabel(data.serviceLabel || "");
       setMerchantName(data.merchantName || "Toko / Merchant");
       setDate(data.date || getTodayDateISO());
       setCategory(data.suggestedCategory || "Belanja Harian");
@@ -273,6 +279,8 @@ export function ReceiptScannerPanel({
         type: "expense",
         title: merchantName.trim(),
         merchantName: merchantName.trim(),
+        sourcePlatform: sourcePlatform.trim() || undefined,
+        serviceLabel: serviceLabel.trim() || undefined,
         category,
         amount: Math.round(totalAmount),
         date,
@@ -291,6 +299,8 @@ export function ReceiptScannerPanel({
       );
       setPreviewDataUrl(null);
       setItems([]);
+      setSourcePlatform("Struk Toko");
+      setServiceLabel("");
       setMerchantName("");
       setTaxOrService(0);
       setDiscount(0);
@@ -357,8 +367,22 @@ export function ReceiptScannerPanel({
             )}
           </div>
 
+          {/* Gallery / File Picker (NO capture attribute so OS opens Photo Gallery & Screenshots) */}
           <input
-            ref={fileInputRef}
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              void handleFileChange(file);
+              e.target.value = "";
+            }}
+          />
+
+          {/* Direct Mobile Camera Capture Input */}
+          <input
+            ref={cameraCaptureInputRef}
             type="file"
             accept="image/*"
             capture="environment"
@@ -410,23 +434,27 @@ export function ReceiptScannerPanel({
               className="mt-4 border-2 border-dashed border-slate-300 hover:border-teal-600 rounded-xl p-6 sm:p-8 text-center transition-colors bg-slate-50/70"
             >
               <div className="w-11 h-11 rounded-lg bg-white border border-slate-200 flex items-center justify-center mx-auto text-teal-700">
-                <Upload className="w-5 h-5" />
+                <ImageIcon className="w-5 h-5" />
               </div>
               <h3 className="text-sm font-semibold text-slate-900 mt-4">
-                Unggah atau Foto Nota Belanja
+                Unggah Nota dari Galeri atau Kamera
               </h3>
               <p className="text-xs text-slate-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
-                Pilih dari galeri, seret gambar ke sini, atau gunakan kamera langsung untuk membuat pratinjau nota.
+                Mendukung foto struk kertas serta tangkapan layar pesanan dari{" "}
+                <span className="font-medium text-slate-700">
+                  Gojek, Grab, Shopee, Tokopedia, TikTok Shop, Lazada, &amp; Blibli
+                </span>
+                .
               </p>
 
               <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => galleryInputRef.current?.click()}
                   className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors whitespace-nowrap"
                 >
-                  <Upload className="w-4 h-4" />
-                  Pilih Gambar Nota
+                  <ImageIcon className="w-4 h-4" />
+                  Pilih dari Galeri
                 </button>
                 <button
                   type="button"
@@ -434,7 +462,15 @@ export function ReceiptScannerPanel({
                   className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Camera className="w-4 h-4" />
-                  Buka Kamera
+                  Kamera Web
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cameraCaptureInputRef.current?.click()}
+                  className="sm:hidden min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Camera className="w-4 h-4" />
+                  Foto Langsung (Kamera HP)
                 </button>
               </div>
 
@@ -579,14 +615,49 @@ export function ReceiptScannerPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                    Nama Toko / Keterangan
+                    Sumber / Platform Nota
+                  </label>
+                  <select
+                    value={sourcePlatform}
+                    onChange={(e) => setSourcePlatform(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                  >
+                    {SOURCE_PLATFORMS.map((plat) => (
+                      <option key={plat} value={plat}>
+                        {plat}
+                      </option>
+                    ))}
+                    {!SOURCE_PLATFORMS.includes(
+                      sourcePlatform as (typeof SOURCE_PLATFORMS)[number]
+                    ) && (
+                      <option value={sourcePlatform}>{sourcePlatform}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                    Layanan (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={serviceLabel}
+                    onChange={(e) => setServiceLabel(e.target.value)}
+                    placeholder="Contoh: GoFood, GrabCar, Shopee Mall"
+                    className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                    Nama Toko / Merchant / Rute
                   </label>
                   <input
                     type="text"
                     required
                     value={merchantName}
                     onChange={(e) => setMerchantName(e.target.value)}
-                    placeholder="Contoh: Indomaret, Kopi Kenangan"
+                    placeholder="Contoh: HokBen, GoCar Gambir → Sudirman"
                     className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
                   />
                 </div>
@@ -785,7 +856,7 @@ export function ReceiptScannerPanel({
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                      Pajak / Layanan (Rp)
+                      Ongkir / Pajak / Layanan (Rp)
                     </label>
                     <input
                       type="number"

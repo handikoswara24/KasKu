@@ -37,6 +37,15 @@ export function ReceiptDetailModal({
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 truncate">
               {formatDateID(transaction.date)}
+              {transaction.sourcePlatform && (
+                <>
+                  <span className="mx-1.5" aria-hidden="true">·</span>
+                  <span className="text-slate-700 font-medium">
+                    {transaction.sourcePlatform}
+                    {transaction.serviceLabel ? ` (${transaction.serviceLabel})` : ""}
+                  </span>
+                </>
+              )}
               <span className="mx-1.5" aria-hidden="true">·</span>
               {transaction.category}
               <span className="mx-1.5" aria-hidden="true">·</span>
@@ -129,7 +138,7 @@ export function ReceiptDetailModal({
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-1.5 text-xs">
               {transaction.taxOrService ? (
                 <div className="flex justify-between text-slate-600">
-                  <span>Pajak / Biaya Layanan</span>
+                  <span>Ongkir / Pajak / Biaya Layanan</span>
                   <span className="font-mono tabular-nums">
                     {formatIDR(transaction.taxOrService)}
                   </span>

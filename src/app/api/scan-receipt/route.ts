@@ -7,6 +7,7 @@ import {
   ITEM_TYPE_SUGGESTIONS,
   PAYMENT_METHODS,
   ReceiptScanResult,
+  SOURCE_PLATFORMS,
 } from "@/types/finance";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ interface RawGeminiItem {
 }
 
 interface RawGeminiReceipt {
+  sourcePlatform?: string;
+  serviceLabel?: string;
   merchantName?: string;
   date?: string;
   currency?: string;
@@ -81,22 +84,31 @@ export async function POST(request: NextRequest) {
     });
 
     const today = getTodayDateISO();
-    const promptText = `Analisis foto nota/struk belanja ini secara teliti dalam Bahasa Indonesia.
-Tugas Anda:
-1. Ekstrak nama toko/merchant (merchantName) dan tanggal transaksi dalam format YYYY-MM-DD (jika tanggal tidak terlihat jelas di struk, gunakan "${today}").
-2. Ekstrak seluruh barang/item yang dibeli ke dalam array items:
-   - name: nama barang yang jelas dan rapi
-   - quantity: jumlah unit (angka, default 1 jika tidak tertulis)
-   - unitPrice: harga satuan dalam angka (tanpa simbol mata uang, tanpa pemisah ribuan)
-   - totalPrice: total harga untuk baris barang tersebut
-   - suggestedType: pilih saran tipe barang yang paling tepat dari daftar berikut: ${ITEM_TYPE_SUGGESTIONS.join(", ")}
-   - typeReason: alasan singkat (3-6 kata) mengapa tipe tersebut disarankan
-3. Ekstrak pajak/PPN/biaya layanan (taxOrService), diskon/potongan (discount), dan total akhir pengeluaran (totalAmount).
-4. Berikan suggestedCategory untuk transaksi keseluruhan dari daftar: ${EXPENSE_CATEGORIES.join(", ")}.
-5. Deteksi paymentMethod jika terlihat pada nota dari daftar: ${PAYMENT_METHODS.join(", ")}.
-6. Buat ringkasan 1 kalimat singkat di field notes.
+    const promptText = `Analisis gambar nota fisik ATAU tangkapan layar (screenshot) transaksi digital dari Gojek, Grab, atau E-Commerce Indonesia (Shopee, Tokopedia, TikTok Shop, Lazada, Blibli, Bukalapak, Zalora, Astro, dll.) secara sangat teliti dalam Bahasa Indonesia.
 
-Pastikan semua nilai numerik dalam Rupiah penuh (angka bulat positif). Jika angka pada struk memakai titik atau koma pemisah ribuan Indonesia (misal 25.000), konversi menjadi 25000.`;
+Tugas Anda:
+1. Identifikasi platform sumber transaksi (sourcePlatform) dari daftar: ${SOURCE_PLATFORMS.join(", ")}.
+   - Jika screenshot berasal dari aplikasi Gojek (GoFood, GoRide, GoCar, GoSend, GoMart, GoTagihan), pilih "Gojek".
+   - Jika screenshot berasal dari aplikasi Grab (GrabFood, GrabBike, GrabCar, GrabExpress, GrabMart), pilih "Grab".
+   - Jika dari aplikasi belanja online, pilih nama e-commerce yang sesuai ("Shopee", "Tokopedia", "TikTok Shop", "Lazada", "Blibli", atau "Lainnya").
+   - Jika struk kertas kasir/toko fisik biasa, pilih "Struk Toko".
+2. Identifikasi jenis layanan (serviceLabel) secara singkat, misalnya: "GoFood", "GoCar", "GoRide", "GoSend", "GrabFood", "GrabCar", "GrabBike", "Pesanan Shopee", "Pesanan Tokopedia", atau "Struk Kasir".
+3. Ekstrak merchantName:
+   - Untuk makanan/toko/e-commerce: nama restoran, merchant, atau nama toko penjual.
+   - Untuk transportasi (GoRide/GoCar/GrabBike/GrabCar) atau kurir (GoSend/GrabExpress): tulis layanan & rute singkatnya, misalnya "GoCar · Gambir → Sudirman".
+4. Ekstrak tanggal transaksi ke format YYYY-MM-DD (konversi format tanggal Indonesia seperti "15 Nov 2026" atau "22 Jun 2024" menjadi YYYY-MM-DD; jika benar-benar tidak ada tanggal di gambar, gunakan "${today}").
+5. Ekstrak seluruh item/barang/layanan yang dibeli ke dalam array items:
+   - Untuk GoFood/GrabFood/E-Commerce/Struk Toko: masukkan tiap menu atau produk yang dibeli (abaikan harga coret, ambil harga yang dibayar), dengan quantity, unitPrice, totalPrice.
+   - Untuk perjalanan GoRide/GoCar/GrabBike/GrabCar atau pengiriman GoSend/GrabExpress: masukkan tarif perjalanan/pengiriman sebagai item dengan suggestedType "Transportasi & BBM" atau "Biaya Pengiriman & Kurir".
+   - Untuk setiap item, wajib pilih suggestedType dari daftar: ${ITEM_TYPE_SUGGESTIONS.join(", ")}, serta typeReason singkat (3-6 kata).
+6. taxOrService: gabungkan biaya ongkos kirim, biaya aplikasi, biaya jasa platform, biaya layanan, asuransi pengiriman, atau pajak PB1/PPN yang terpisah dari harga barang (0 jika tidak ada).
+7. discount: gabungkan seluruh potongan harga, promo, voucher toko, voucher gratis ongkir, atau penukaran koin yang mengurangi total bayar (0 jika tidak ada).
+8. totalAmount: total akhir pengeluaran yang benar-benar dibayar oleh pengguna ("Total Bayar", "Total Pembayaran", "Total Pesanan", atau "Total").
+9. suggestedCategory: pilih kategori utama pengeluaran dari daftar: ${EXPENSE_CATEGORIES.join(", ")}. (Gunakan "Transportasi" untuk GoRide/GoCar/GrabBike/GrabCar; "Makanan & Minuman" untuk GoFood/GrabFood/restoran; "Belanja Online" untuk pembelian produk e-commerce jika beragam).
+10. paymentMethod: deteksi metode pembayaran dari daftar: ${PAYMENT_METHODS.join(", ")} (misal GoPay, OVO, ShopeePay, QRIS, Transfer Bank / VA, Kartu Debit, Kartu Kredit, Tunai).
+11. notes: ringkasan 1 kalimat singkat tentang transaksi ini.
+
+Pastikan seluruh angka adalah bilangan bulat Rupiah penuh (hilangkan titik/koma pemisah ribuan seperti 25.000 menjadi 25000).`;
 
     const response = await ai.models.generateContent({
       model: "gemini-4-hydrogen",
@@ -119,6 +131,8 @@ Pastikan semua nilai numerik dalam Rupiah penuh (angka bulat positif). Jika angk
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            sourcePlatform: { type: Type.STRING },
+            serviceLabel: { type: Type.STRING },
             merchantName: { type: Type.STRING },
             date: { type: Type.STRING },
             currency: { type: Type.STRING },
@@ -144,7 +158,14 @@ Pastikan semua nilai numerik dalam Rupiah penuh (angka bulat positif). Jika angk
             paymentMethod: { type: Type.STRING },
             notes: { type: Type.STRING },
           },
-          required: ["merchantName", "date", "items", "totalAmount", "suggestedCategory"],
+          required: [
+            "sourcePlatform",
+            "merchantName",
+            "date",
+            "items",
+            "totalAmount",
+            "suggestedCategory",
+          ],
         },
       },
     });
@@ -182,6 +203,8 @@ Pastikan semua nilai numerik dalam Rupiah penuh (angka bulat positif). Jika angk
       parsed.date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? parsed.date : today;
 
     const result: ReceiptScanResult = {
+      sourcePlatform: parsed.sourcePlatform?.trim() || "Struk Toko",
+      serviceLabel: parsed.serviceLabel?.trim() || "",
       merchantName: parsed.merchantName?.trim() || "Toko / Merchant",
       date: validDate,
       currency: parsed.currency?.trim() || "IDR",
@@ -191,7 +214,7 @@ Pastikan semua nilai numerik dalam Rupiah penuh (angka bulat positif). Jika angk
       totalAmount: computedTotal,
       suggestedCategory: parsed.suggestedCategory?.trim() || "Belanja Harian",
       paymentMethod: parsed.paymentMethod?.trim() || "QRIS",
-      notes: parsed.notes?.trim() || "Transaksi dari pemindaian foto nota.",
+      notes: parsed.notes?.trim() || "Transaksi dari pemindaian nota.",
     };
 
     return NextResponse.json(result, { status: 200 });

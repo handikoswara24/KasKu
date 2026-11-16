@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -23,10 +23,28 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#0f766e",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "KasKu — Catatan Keuangan & Pemindai Nota",
   description:
     "Aplikasi pencatatan pemasukan dan pengeluaran pribadi berbasis Next.js dan MongoDB dengan pemindai nota AI, grafik ringkasan bulanan, dan ekspor laporan PDF.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "KasKu",
+  },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "KasKu — Catatan Keuangan & Pemindai Nota",
     description:

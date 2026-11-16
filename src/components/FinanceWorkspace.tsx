@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import { ManualTransactionModal } from "@/components/ManualTransactionModal";
 import { MonthlyCharts } from "@/components/MonthlyCharts";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { PWAInstallButton } from "@/components/PWAInstallButton";
+import { PWARegister } from "@/components/PWARegister";
 import { ReceiptDetailModal } from "@/components/ReceiptDetailModal";
 import { ReceiptScannerPanel } from "@/components/ReceiptScannerPanel";
 import {
@@ -223,6 +226,8 @@ export function FinanceWorkspace({
       return (
         tx.title.toLowerCase().includes(q) ||
         (tx.merchantName ?? "").toLowerCase().includes(q) ||
+        (tx.sourcePlatform ?? "").toLowerCase().includes(q) ||
+        (tx.serviceLabel ?? "").toLowerCase().includes(q) ||
         tx.category.toLowerCase().includes(q) ||
         (tx.notes ?? "").toLowerCase().includes(q) ||
         (tx.items ?? []).some((i) => i.name.toLowerCase().includes(q))
@@ -326,6 +331,8 @@ export function FinanceWorkspace({
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 text-slate-900">
+      <PWARegister />
+      <OfflineIndicator />
       {/* Desktop Sidebar (256px) */}
       <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col bg-white border-r border-slate-200 justify-between">
         <div>
@@ -377,7 +384,8 @@ export function FinanceWorkspace({
           </nav>
         </div>
 
-        <div className="p-4 border-t border-slate-200">
+        <div className="p-4 border-t border-slate-200 space-y-2">
+          <PWAInstallButton variant="sidebar" />
           <button
             type="button"
             onClick={() => setMongoInfoOpen(true)}
@@ -477,26 +485,29 @@ export function FinanceWorkspace({
               </button>
             </div>
 
-            {activeTab !== "scanner" && (
-              <div className="shrink-0">
-                <label htmlFor="period-select-mobile" className="sr-only">
-                  Pilih Periode Bulan
-                </label>
-                <select
-                  id="period-select-mobile"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="min-h-[40px] px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
-                >
-                  <option value="all">Semua Periode</option>
-                  {monthOptions.map((key) => (
-                    <option key={key} value={key}>
-                      {formatMonthLabel(key, false)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              <PWAInstallButton variant="compact" />
+              {activeTab !== "scanner" && (
+                <div>
+                  <label htmlFor="period-select-mobile" className="sr-only">
+                    Pilih Periode Bulan
+                  </label>
+                  <select
+                    id="period-select-mobile"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="min-h-[40px] px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                  >
+                    <option value="all">Semua Periode</option>
+                    {monthOptions.map((key) => (
+                      <option key={key} value={key}>
+                        {formatMonthLabel(key, false)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           {loadError && (
@@ -722,6 +733,15 @@ export function FinanceWorkspace({
                                 <span className="font-mono tabular-nums">
                                   {formatDateID(tx.date)}
                                 </span>
+                                {tx.sourcePlatform && (
+                                  <>
+                                    <span aria-hidden="true">·</span>
+                                    <span className="text-slate-700 font-medium">
+                                      {tx.sourcePlatform}
+                                      {tx.serviceLabel ? ` (${tx.serviceLabel})` : ""}
+                                    </span>
+                                  </>
+                                )}
                                 <span aria-hidden="true">·</span>
                                 <span>{tx.category}</span>
                                 <span aria-hidden="true">·</span>
@@ -853,6 +873,15 @@ export function FinanceWorkspace({
                                   {tx.title}
                                 </div>
                                 <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                                  {tx.sourcePlatform && (
+                                    <>
+                                      <span className="text-slate-700 font-medium">
+                                        {tx.sourcePlatform}
+                                        {tx.serviceLabel ? ` (${tx.serviceLabel})` : ""}
+                                      </span>
+                                      <span aria-hidden="true">·</span>
+                                    </>
+                                  )}
                                   <span>{tx.category}</span>
                                   <span aria-hidden="true">·</span>
                                   <span>{tx.paymentMethod}</span>

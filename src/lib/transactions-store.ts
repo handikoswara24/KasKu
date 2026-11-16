@@ -19,6 +19,8 @@ interface MongoTransactionDoc {
   type: "income" | "expense";
   title: string;
   merchantName?: string;
+  sourcePlatform?: string;
+  serviceLabel?: string;
   category: string;
   amount: number;
   date: string;
@@ -65,6 +67,8 @@ function serializeMongoDoc(doc: WithId<MongoTransactionDoc>): TransactionRecord 
     type: doc.type,
     title: doc.title,
     merchantName: doc.merchantName,
+    sourcePlatform: doc.sourcePlatform,
+    serviceLabel: doc.serviceLabel,
     category: doc.category,
     amount: Number(doc.amount) || 0,
     date: doc.date,
@@ -140,6 +144,8 @@ export async function listTransactions(filters?: {
       (item) =>
         item.title.toLowerCase().includes(q) ||
         (item.merchantName ?? "").toLowerCase().includes(q) ||
+        (item.sourcePlatform ?? "").toLowerCase().includes(q) ||
+        (item.serviceLabel ?? "").toLowerCase().includes(q) ||
         item.category.toLowerCase().includes(q) ||
         (item.notes ?? "").toLowerCase().includes(q) ||
         (item.items ?? []).some((sub) => sub.name.toLowerCase().includes(q))
@@ -157,6 +163,8 @@ export async function createTransaction(
     type: input.type,
     title: input.title.trim(),
     merchantName: input.merchantName?.trim() || undefined,
+    sourcePlatform: input.sourcePlatform?.trim() || undefined,
+    serviceLabel: input.serviceLabel?.trim() || undefined,
     category: input.category.trim(),
     amount: Math.max(0, Math.round(Number(input.amount) || 0)),
     date: input.date,
@@ -239,6 +247,8 @@ export async function updateTransaction(
     if (updates.type) $set.type = updates.type;
     if (updates.title !== undefined) $set.title = updates.title.trim();
     if (updates.merchantName !== undefined) $set.merchantName = updates.merchantName.trim();
+    if (updates.sourcePlatform !== undefined) $set.sourcePlatform = updates.sourcePlatform.trim();
+    if (updates.serviceLabel !== undefined) $set.serviceLabel = updates.serviceLabel.trim();
     if (updates.category !== undefined) $set.category = updates.category.trim();
     if (updates.amount !== undefined) $set.amount = Math.max(0, Math.round(Number(updates.amount) || 0));
     if (updates.date !== undefined) $set.date = updates.date;

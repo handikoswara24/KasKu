@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
       type: body.type,
       title: body.title.trim(),
       merchantName: body.merchantName?.trim(),
+      sourcePlatform: body.sourcePlatform?.trim(),
+      serviceLabel: body.serviceLabel?.trim(),
       category: body.category?.trim() || "Lainnya",
       amount: Math.round(numericAmount),
       date: body.date,

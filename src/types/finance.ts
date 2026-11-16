@@ -14,6 +14,7 @@ export const INCOME_CATEGORIES = [
 export const EXPENSE_CATEGORIES = [
   "Makanan & Minuman",
   "Belanja Harian",
+  "Belanja Online",
   "Transportasi",
   "Tagihan & Utilitas",
   "Kesehatan",
@@ -31,6 +32,7 @@ export const ITEM_TYPE_SUGGESTIONS = [
   "Perawatan Pribadi",
   "Kesehatan & Obat",
   "Transportasi & BBM",
+  "Biaya Pengiriman & Kurir",
   "Elektronik & Gadget",
   "Pakaian & Aksesoris",
   "Hiburan & Gaya Hidup",
@@ -39,13 +41,28 @@ export const ITEM_TYPE_SUGGESTIONS = [
   "Lainnya",
 ] as const;
 
+export const SOURCE_PLATFORMS = [
+  "Struk Toko",
+  "Gojek",
+  "Grab",
+  "Shopee",
+  "Tokopedia",
+  "TikTok Shop",
+  "Lazada",
+  "Blibli",
+  "Lainnya",
+] as const;
+
 export const PAYMENT_METHODS = [
   "QRIS",
-  "Transfer Bank",
-  "Tunai",
+  "GoPay",
+  "OVO",
+  "ShopeePay",
+  "Transfer Bank / VA",
+  "E-Wallet",
   "Kartu Debit",
   "Kartu Kredit",
-  "E-Wallet",
+  "Tunai",
   "Lainnya",
 ] as const;
 
@@ -64,6 +81,8 @@ export interface TransactionRecord {
   type: TransactionType;
   title: string;
   merchantName?: string;
+  sourcePlatform?: string;
+  serviceLabel?: string;
   category: string;
   amount: number;
   date: string; // YYYY-MM-DD
@@ -82,6 +101,8 @@ export interface CreateTransactionInput {
   type: TransactionType;
   title: string;
   merchantName?: string;
+  sourcePlatform?: string;
+  serviceLabel?: string;
   category: string;
   amount: number;
   date: string;
@@ -95,6 +116,8 @@ export interface CreateTransactionInput {
 }
 
 export interface ReceiptScanResult {
+  sourcePlatform: string;
+  serviceLabel: string;
   merchantName: string;
   date: string;
   currency: string;
