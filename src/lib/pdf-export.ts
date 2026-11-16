@@ -13,7 +13,10 @@ interface ExportPdfOptions {
   categoryBreakdown: CategoryAggregate[];
 }
 
-export function exportFinanceReportPDF(options: ExportPdfOptions): void {
+export function exportFinanceReportPDF(options: ExportPdfOptions): {
+  fileName: string;
+  blobUrl: string;
+} {
   const {
     transactions,
     periodLabel,
@@ -223,5 +226,17 @@ export function exportFinanceReportPDF(options: ExportPdfOptions): void {
     selectedMonth === "all"
       ? "Semua-Periode"
       : formatMonthLabel(selectedMonth).replace(/\s+/g, "-");
-  doc.save(`Laporan-Keuangan-${fileSlug}.pdf`);
+  const fileName = `Laporan-Keuangan-${fileSlug}.pdf`;
+  const blob = doc.output("blob");
+  const blobUrl = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  return { fileName, blobUrl };
 }

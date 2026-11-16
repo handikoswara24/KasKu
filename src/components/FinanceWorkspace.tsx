@@ -116,6 +116,23 @@ export function FinanceWorkspace({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mongoInfoOpen, setMongoInfoOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfFeedback, setPdfFeedback] = useState<{
+    type: "info" | "success" | "error";
+    message: string;
+    downloadUrl?: string;
+    fileName?: string;
+    showExportAll?: boolean;
+  } | null>(null);
+
+  const pdfDownloadUrl = pdfFeedback?.downloadUrl;
+  useEffect(() => {
+    return () => {
+      if (pdfDownloadUrl) {
+        URL.revokeObjectURL(pdfDownloadUrl);
+      }
+    };
+  }, [pdfDownloadUrl]);
 
   const openUsernamePrompt = (
     reason?: string | null,
@@ -400,16 +417,104 @@ export function FinanceWorkspace({
       ? "Semua Periode"
       : formatMonthLabel(selectedMonth, false);
 
+  const runPdfExport = (
+    exportList: TransactionRecord[],
+    periodLabelText: string,
+    monthParam: string
+  ) => {
+    setIsExportingPdf(true);
+    try {
+      let pdfIncome = 0;
+      let pdfExpense = 0;
+      const catMap = new Map<string, { amount: number; count: number }>();
+
+      for (const tx of exportList) {
+        if (tx.type === "income") {
+          pdfIncome += tx.amount;
+        } else {
+          pdfExpense += tx.amount;
+          const cur = catMap.get(tx.category) ?? { amount: 0, count: 0 };
+          catMap.set(tx.category, {
+            amount: cur.amount + tx.amount,
+            count: cur.count + 1,
+          });
+        }
+      }
+
+      const pdfCategories: CategoryAggregate[] = Array.from(catMap.entries())
+        .map(([category, stats]) => ({
+          category,
+          amount: stats.amount,
+          count: stats.count,
+          percentage: pdfExpense > 0 ? (stats.amount / pdfExpense) * 100 : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      const { fileName, blobUrl } = exportFinanceReportPDF({
+        transactions: exportList,
+        periodLabel: periodLabelText,
+        selectedMonth: monthParam,
+        totalIncome: pdfIncome,
+        totalExpense: pdfExpense,
+        netBalance: pdfIncome - pdfExpense,
+        categoryBreakdown: pdfCategories,
+      });
+
+      setPdfFeedback((prev) => {
+        if (prev?.downloadUrl) URL.revokeObjectURL(prev.downloadUrl);
+        return {
+          type: "success",
+          message: `PDF "${fileName}" (${exportList.length} transaksi) berhasil dibuat.`,
+          downloadUrl: blobUrl,
+          fileName,
+        };
+      });
+    } catch (err) {
+      setPdfFeedback({
+        type: "error",
+        message:
+          err instanceof Error
+            ? `Gagal membuat PDF: ${err.message}`
+            : "Gagal membuat laporan PDF.",
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handleExportPdf = () => {
-    exportFinanceReportPDF({
-      transactions: visibleTransactions,
-      periodLabel: activePeriodLabel,
-      selectedMonth,
-      totalIncome,
-      totalExpense,
-      netBalance,
-      categoryBreakdown,
-    });
+    if (transactions.length === 0) {
+      setPdfFeedback({
+        type: "info",
+        message:
+          "Belum ada data transaksi untuk diekspor ke PDF. Catat transaksi terlebih dahulu.",
+      });
+      return;
+    }
+
+    if (visibleTransactions.length === 0) {
+      const filterDesc =
+        usernameFilter === "all"
+          ? activePeriodLabel
+          : usernameFilter === "__unassigned__"
+          ? `${activePeriodLabel} · Tanpa Username`
+          : `${activePeriodLabel} · Username: ${usernameFilter}`;
+      setPdfFeedback({
+        type: "info",
+        message: `Tidak ada transaksi pada filter (${filterDesc}). Ubah filter atau ekspor seluruh transaksi tersimpan.`,
+        showExportAll: true,
+      });
+      return;
+    }
+
+    const labelSuffix =
+      usernameFilter === "all"
+        ? activePeriodLabel
+        : usernameFilter === "__unassigned__"
+        ? `${activePeriodLabel} · Tanpa Username`
+        : `${activePeriodLabel} · ${usernameFilter}`;
+
+    runPdfExport(visibleTransactions, labelSuffix, selectedMonth);
   };
 
   const tabTitles: Record<WorkspaceTab, string> = {
@@ -566,12 +671,20 @@ export function FinanceWorkspace({
             <button
               type="button"
               onClick={handleExportPdf}
-              disabled={visibleTransactions.length === 0}
+              disabled={isExportingPdf}
               className="min-h-[40px] sm:min-h-[36px] inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Ekspor PDF</span>
-              <span className="sm:hidden">PDF</span>
+              {isExportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {isExportingPdf ? "Membuat PDF..." : "Ekspor PDF"}
+              </span>
+              <span className="sm:hidden">
+                {isExportingPdf ? "..." : "PDF"}
+              </span>
             </button>
 
             <button
@@ -666,6 +779,58 @@ export function FinanceWorkspace({
               >
                 Atur Username
               </button>
+            </div>
+          )}
+
+          {pdfFeedback && (
+            <div
+              role="status"
+              className={`rounded-xl px-4 py-3 text-xs sm:text-sm border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                pdfFeedback.type === "error"
+                  ? "bg-rose-50 border-rose-200 text-rose-900"
+                  : pdfFeedback.type === "success"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                  : "bg-slate-100 border-slate-300 text-slate-800"
+              }`}
+            >
+              <span>{pdfFeedback.message}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                {pdfFeedback.showExportAll && transactions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      runPdfExport(
+                        transactions,
+                        "Semua Periode · Semua Username",
+                        "all"
+                      )
+                    }
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Ekspor Semua ({transactions.length})
+                  </button>
+                )}
+                {pdfFeedback.downloadUrl && (
+                  <a
+                    href={pdfFeedback.downloadUrl}
+                    download={pdfFeedback.fileName ?? "Laporan-Keuangan.pdf"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-900 bg-white border border-emerald-300 hover:bg-emerald-100 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Unduh / Buka PDF
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPdfFeedback(null)}
+                  className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-900 rounded-lg"
+                  aria-label="Tutup pemberitahuan PDF"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
 
