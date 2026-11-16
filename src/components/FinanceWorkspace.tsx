@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   FileSpreadsheet,
+  Loader2,
   Pencil,
   Plus,
   ReceiptText,
@@ -106,6 +107,7 @@ export function FinanceWorkspace({
   const [editingRecord, setEditingRecord] = useState<TransactionRecord | null>(null);
   const [detailRecord, setDetailRecord] = useState<TransactionRecord | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mongoInfoOpen, setMongoInfoOpen] = useState(false);
 
   const openUsernamePrompt = (
@@ -226,6 +228,9 @@ export function FinanceWorkspace({
   };
 
   const handleDeleteTransaction = async (id: string) => {
+    if (deletingId) return;
+    setDeletingId(id);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/transactions/${encodeURIComponent(id)}`, {
         method: "DELETE",
@@ -240,6 +245,8 @@ export function FinanceWorkspace({
       setLoadError(
         err instanceof Error ? err.message : "Gagal menghapus transaksi."
       );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -911,15 +918,20 @@ export function FinanceWorkspace({
                               <div className="inline-flex items-center gap-2">
                                 <button
                                   type="button"
+                                  disabled={deletingId === tx.id}
                                   onClick={() => void handleDeleteTransaction(tx.id)}
-                                  className="min-h-[40px] text-xs font-medium text-white bg-rose-700 hover:bg-rose-800 px-3 py-1.5 rounded-lg transition-colors"
+                                  className="min-h-[40px] inline-flex items-center gap-1.5 text-xs font-medium text-white bg-rose-700 hover:bg-rose-800 disabled:bg-rose-700/70 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors"
                                 >
-                                  Hapus
+                                  {deletingId === tx.id && (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                  )}
+                                  {deletingId === tx.id ? "Menghapus..." : "Hapus"}
                                 </button>
                                 <button
                                   type="button"
+                                  disabled={deletingId === tx.id}
                                   onClick={() => setConfirmDeleteId(null)}
-                                  className="min-h-[40px] text-xs text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200"
+                                  className="min-h-[40px] text-xs text-slate-600 hover:text-slate-900 disabled:opacity-50 px-3 py-1.5 rounded-lg border border-slate-200"
                                 >
                                   Batal
                                 </button>
@@ -1059,17 +1071,22 @@ export function FinanceWorkspace({
                                   <div className="inline-flex items-center gap-2">
                                     <button
                                       type="button"
+                                      disabled={deletingId === tx.id}
                                       onClick={() =>
                                         void handleDeleteTransaction(tx.id)
                                       }
-                                      className="text-xs font-medium text-white bg-rose-700 hover:bg-rose-800 px-2.5 py-1 rounded transition-colors"
+                                      className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-rose-700 hover:bg-rose-800 disabled:bg-rose-700/70 disabled:cursor-not-allowed px-2.5 py-1 rounded transition-colors"
                                     >
-                                      Hapus
+                                      {deletingId === tx.id && (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                      )}
+                                      {deletingId === tx.id ? "Menghapus..." : "Hapus"}
                                     </button>
                                     <button
                                       type="button"
+                                      disabled={deletingId === tx.id}
                                       onClick={() => setConfirmDeleteId(null)}
-                                      className="text-xs text-slate-600 hover:text-slate-900 px-2 py-1"
+                                      className="text-xs text-slate-600 hover:text-slate-900 disabled:opacity-50 px-2 py-1"
                                     >
                                       Batal
                                     </button>
