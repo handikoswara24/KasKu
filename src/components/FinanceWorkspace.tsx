@@ -308,23 +308,31 @@ export function FinanceWorkspace({
     };
   }, [transactions, username]);
 
-  const periodTransactions = useMemo(() => {
+  const usernameScopedTransactions = useMemo(() => {
+    if (usernameFilter === "all") return transactions;
+    if (usernameFilter === "__unassigned__") {
+      return transactions.filter((tx) => !tx.username || !tx.username.trim());
+    }
+    const target = usernameFilter.trim().toLowerCase();
+    return transactions.filter(
+      (tx) => (tx.username ?? "").trim().toLowerCase() === target
+    );
+  }, [transactions, usernameFilter]);
+
+  const monthScopedTransactions = useMemo(() => {
     if (selectedMonth === "all") return transactions;
     return transactions.filter((tx) => tx.date.startsWith(selectedMonth));
   }, [transactions, selectedMonth]);
 
+  const periodTransactions = useMemo(() => {
+    if (selectedMonth === "all") return usernameScopedTransactions;
+    return usernameScopedTransactions.filter((tx) =>
+      tx.date.startsWith(selectedMonth)
+    );
+  }, [usernameScopedTransactions, selectedMonth]);
+
   const visibleTransactions = useMemo(() => {
     return periodTransactions.filter((tx) => {
-      if (usernameFilter === "__unassigned__") {
-        if (tx.username && tx.username.trim().length > 0) return false;
-      } else if (usernameFilter !== "all") {
-        if (
-          (tx.username ?? "").trim().toLowerCase() !==
-          usernameFilter.trim().toLowerCase()
-        ) {
-          return false;
-        }
-      }
       if (typeFilter !== "all" && tx.type !== typeFilter) return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.trim().toLowerCase();
@@ -339,7 +347,7 @@ export function FinanceWorkspace({
         (tx.items ?? []).some((i) => i.name.toLowerCase().includes(q))
       );
     });
-  }, [periodTransactions, usernameFilter, typeFilter, searchQuery]);
+  }, [periodTransactions, typeFilter, searchQuery]);
 
   const { totalIncome, totalExpense, netBalance } = useMemo(() => {
     let income = 0;
@@ -356,7 +364,7 @@ export function FinanceWorkspace({
   }, [periodTransactions]);
 
   const monthlyAggregates: MonthlyAggregate[] = useMemo(() => {
-    const latestTxMonth = transactions[0]?.date?.slice(0, 7);
+    const latestTxMonth = usernameScopedTransactions[0]?.date?.slice(0, 7);
     const anchor =
       selectedMonth !== "all"
         ? selectedMonth
@@ -369,7 +377,7 @@ export function FinanceWorkspace({
       let income = 0;
       let expense = 0;
       let count = 0;
-      for (const tx of transactions) {
+      for (const tx of usernameScopedTransactions) {
         if (tx.date.startsWith(key)) {
           count += 1;
           if (tx.type === "income") income += tx.amount;
@@ -386,7 +394,7 @@ export function FinanceWorkspace({
         count,
       };
     });
-  }, [transactions, selectedMonth]);
+  }, [usernameScopedTransactions, selectedMonth, fallbackMonth]);
 
   const categoryBreakdown: CategoryAggregate[] = useMemo(() => {
     const map = new Map<string, { amount: number; count: number }>();
@@ -416,6 +424,13 @@ export function FinanceWorkspace({
     selectedMonth === "all"
       ? "Semua Periode"
       : formatMonthLabel(selectedMonth, false);
+
+  const activeUsernameLabel =
+    usernameFilter === "all"
+      ? "Semua Username"
+      : usernameFilter === "__unassigned__"
+      ? "Tanpa Username"
+      : usernameFilter;
 
   const runPdfExport = (
     exportList: TransactionRecord[],
@@ -650,6 +665,34 @@ export function FinanceWorkspace({
               </span>
             </button>
 
+            {/* Desktop Username Filter in Header */}
+            <label htmlFor="header-username-filter" className="sr-only">
+              Filter berdasarkan username
+            </label>
+            <select
+              id="header-username-filter"
+              value={usernameFilter}
+              onChange={(e) => {
+                setHasManualUsernameFilter(true);
+                setUsernameFilter(e.target.value);
+              }}
+              className="hidden lg:block max-w-[165px] px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 whitespace-nowrap shrink-0"
+              title="Filter ringkasan, grafik & catatan berdasarkan username"
+            >
+              <option value="all">Semua Username</option>
+              {usernameOptions.map((name) => (
+                <option key={name} value={name}>
+                  {username &&
+                  name.toLowerCase() === username.trim().toLowerCase()
+                    ? `${name} (Saya)`
+                    : name}
+                </option>
+              ))}
+              {hasUnassignedTransactions && (
+                <option value="__unassigned__">Tanpa Username</option>
+              )}
+            </select>
+
             {/* Desktop Period Selector in Header */}
             <label htmlFor="period-select-desktop" className="sr-only">
               Pilih Periode Bulan
@@ -701,44 +744,77 @@ export function FinanceWorkspace({
 
         {/* Main Viewport (pb-24 on mobile to clear fixed bottom tab bar) */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-[1360px] w-full mx-auto space-y-4 sm:space-y-6">
-          {/* Mobile Context Toolbar: Page Title + Period Filter + DB & Username Info */}
-          <div className="lg:hidden flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold text-slate-900 truncate">
-                {tabTitles[activeTab]}
-              </h2>
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-0.5">
-                <button
-                  type="button"
-                  onClick={() => openUsernamePrompt()}
-                  className={`inline-flex items-center gap-1 text-[11px] font-medium ${
-                    hasUsername
-                      ? "text-teal-700 hover:text-teal-800"
-                      : "text-amber-700 hover:text-amber-800"
-                  }`}
-                >
-                  <User className="w-3 h-3" />
-                  <span className="max-w-[110px] truncate">
-                    {hasUsername ? username : "Atur Username"}
-                  </span>
-                </button>
-                <span className="text-slate-300 text-[11px]" aria-hidden="true">·</span>
-                <button
-                  type="button"
-                  onClick={() => setMongoInfoOpen(true)}
-                  className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800"
-                >
-                  <Database className="w-3 h-3" />
-                  <span>
-                    {storageMode === "mongodb" ? "MongoDB Aktif" : "Penyimpanan Lokal"}
-                  </span>
-                </button>
+          {/* Mobile Context Toolbar: Page Title + Period & Username Filters + DB & Username Info */}
+          <div className="lg:hidden space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-slate-900 truncate">
+                  {tabTitles[activeTab]}
+                </h2>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => openUsernamePrompt()}
+                    className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                      hasUsername
+                        ? "text-teal-700 hover:text-teal-800"
+                        : "text-amber-700 hover:text-amber-800"
+                    }`}
+                  >
+                    <User className="w-3 h-3" />
+                    <span className="max-w-[110px] truncate">
+                      {hasUsername ? username : "Atur Username"}
+                    </span>
+                  </button>
+                  <span className="text-slate-300 text-[11px]" aria-hidden="true">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setMongoInfoOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800"
+                  >
+                    <Database className="w-3 h-3" />
+                    <span>
+                      {storageMode === "mongodb" ? "MongoDB Aktif" : "Penyimpanan Lokal"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <PWAInstallButton variant="compact" />
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <PWAInstallButton variant="compact" />
-              {activeTab !== "scanner" && (
+            {activeTab !== "scanner" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="username-select-mobile" className="sr-only">
+                    Filter berdasarkan username
+                  </label>
+                  <select
+                    id="username-select-mobile"
+                    value={usernameFilter}
+                    onChange={(e) => {
+                      setHasManualUsernameFilter(true);
+                      setUsernameFilter(e.target.value);
+                    }}
+                    className="w-full min-h-[40px] px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                  >
+                    <option value="all">Semua Username</option>
+                    {usernameOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {username &&
+                        name.toLowerCase() === username.trim().toLowerCase()
+                          ? `${name} (Saya)`
+                          : name}
+                      </option>
+                    ))}
+                    {hasUnassignedTransactions && (
+                      <option value="__unassigned__">Tanpa Username</option>
+                    )}
+                  </select>
+                </div>
+
                 <div>
                   <label htmlFor="period-select-mobile" className="sr-only">
                     Pilih Periode Bulan
@@ -747,7 +823,7 @@ export function FinanceWorkspace({
                     id="period-select-mobile"
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="min-h-[40px] px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    className="w-full min-h-[40px] px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600"
                   >
                     <option value="all">Semua Periode</option>
                     {monthOptions.map((key) => (
@@ -757,8 +833,8 @@ export function FinanceWorkspace({
                     ))}
                   </select>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {isUsernameLoaded && !hasUsername && (
@@ -874,7 +950,7 @@ export function FinanceWorkspace({
                   >
                     <div className="p-4 sm:p-6">
                       <span className="text-xs font-medium text-slate-500 block">
-                        Total Pemasukan · {activePeriodLabel}
+                        Total Pemasukan · {activePeriodLabel} · {activeUsernameLabel}
                       </span>
                       <div className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700">
                         +{formatIDR(totalIncome)}
@@ -890,7 +966,7 @@ export function FinanceWorkspace({
 
                     <div className="p-4 sm:p-6">
                       <span className="text-xs font-medium text-slate-500 block">
-                        Total Pengeluaran · {activePeriodLabel}
+                        Total Pengeluaran · {activePeriodLabel} · {activeUsernameLabel}
                       </span>
                       <div className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums text-rose-700">
                         -{formatIDR(totalExpense)}
@@ -906,7 +982,7 @@ export function FinanceWorkspace({
 
                     <div className="p-4 sm:p-6">
                       <span className="text-xs font-medium text-slate-500 block">
-                        Saldo Bersih · {activePeriodLabel}
+                        Saldo Bersih · {activePeriodLabel} · {activeUsernameLabel}
                       </span>
                       <div
                         className={`mt-1.5 sm:mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums ${
@@ -928,6 +1004,7 @@ export function FinanceWorkspace({
                     selectedMonth={selectedMonth}
                     onSelectMonth={setSelectedMonth}
                     totalExpense={totalExpense}
+                    usernameLabel={activeUsernameLabel}
                   />
                 </>
               )}
@@ -1036,7 +1113,7 @@ export function FinanceWorkspace({
                       <ReceiptText className="w-5 h-5" />
                     </div>
                     <h3 className="text-sm font-semibold text-slate-900 mt-4">
-                      {usernameFilter !== "all" && periodTransactions.length > 0
+                      {usernameFilter !== "all" && monthScopedTransactions.length > 0
                         ? `Tidak Ada Transaksi untuk ${
                             usernameFilter === "__unassigned__"
                               ? "Tanpa Username"
@@ -1047,14 +1124,14 @@ export function FinanceWorkspace({
                         : "Belum Ada Catatan Keuangan"}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                      {usernameFilter !== "all" && periodTransactions.length > 0
-                        ? `Terdapat ${periodTransactions.length} transaksi di periode ini dari pencatat lain. Anda dapat menampilkan semua username untuk melihatnya.`
+                      {usernameFilter !== "all" && monthScopedTransactions.length > 0
+                        ? `Terdapat ${monthScopedTransactions.length} transaksi di periode ini dari pencatat lain. Anda dapat menampilkan semua username untuk melihatnya.`
                         : transactions.length > 0 && selectedMonth !== "all"
                         ? `Terdapat ${transactions.length} transaksi tersimpan di periode lain. Tampilkan semua periode untuk melihat seluruh riwayat.`
                         : "Mulai catat pemasukan dan pengeluaran Anda secara manual atau foto nota belanja untuk mengekstrak daftar barang otomatis."}
                     </p>
                     <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3">
-                      {usernameFilter !== "all" && periodTransactions.length > 0 && (
+                      {usernameFilter !== "all" && monthScopedTransactions.length > 0 && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1065,12 +1142,12 @@ export function FinanceWorkspace({
                           }}
                           className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors whitespace-nowrap"
                         >
-                          Tampilkan Semua Username ({periodTransactions.length})
+                          Tampilkan Semua Username ({monthScopedTransactions.length})
                         </button>
                       )}
                       {transactions.length > 0 &&
                         selectedMonth !== "all" &&
-                        !(usernameFilter !== "all" && periodTransactions.length > 0) && (
+                        !(usernameFilter !== "all" && monthScopedTransactions.length > 0) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1087,7 +1164,7 @@ export function FinanceWorkspace({
                         type="button"
                         onClick={() => setActiveTab("scanner")}
                         className={`min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                          (usernameFilter !== "all" && periodTransactions.length > 0) ||
+                          (usernameFilter !== "all" && monthScopedTransactions.length > 0) ||
                           (transactions.length > 0 && selectedMonth !== "all")
                             ? "text-slate-700 bg-white border border-slate-300 hover:bg-slate-50"
                             : "text-white bg-teal-700 hover:bg-teal-800"

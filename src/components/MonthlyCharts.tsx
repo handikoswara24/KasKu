@@ -10,6 +10,7 @@ interface MonthlyChartsProps {
   selectedMonth: string;
   onSelectMonth: (monthKey: string) => void;
   totalExpense: number;
+  usernameLabel?: string;
 }
 
 export function MonthlyCharts({
@@ -18,6 +19,7 @@ export function MonthlyCharts({
   selectedMonth,
   onSelectMonth,
   totalExpense,
+  usernameLabel,
 }: MonthlyChartsProps) {
   const [hoveredMonthKey, setHoveredMonthKey] = useState<string | null>(null);
 
@@ -49,7 +51,8 @@ export function MonthlyCharts({
               Grafik Arus Kas Bulanan
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Pemasukan dan pengeluaran 6 bulan terakhir. Ketuk bulan untuk memfilter.
+              Pemasukan dan pengeluaran 6 bulan terakhir
+              {usernameLabel ? ` · ${usernameLabel}` : ""}. Ketuk bulan untuk memfilter.
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-600 shrink-0">
