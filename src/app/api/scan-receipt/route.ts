@@ -98,7 +98,7 @@ Tugas Anda:
    - Untuk transportasi (GoRide/GoCar/GrabBike/GrabCar) atau kurir (GoSend/GrabExpress): tulis layanan & rute singkatnya, misalnya "GoCar · Gambir → Sudirman".
 4. Ekstrak tanggal transaksi ke format YYYY-MM-DD (konversi format tanggal Indonesia seperti "15 Nov 2026" atau "22 Jun 2024" menjadi YYYY-MM-DD; jika benar-benar tidak ada tanggal di gambar, gunakan "${today}").
 5. Ekstrak seluruh item/barang/layanan yang dibeli ke dalam array items:
-   - Untuk GoFood/GrabFood/E-Commerce/Struk Toko: masukkan tiap menu atau produk yang dibeli (abaikan harga coret, ambil harga yang dibayar), dengan quantity, unitPrice, totalPrice.
+   - Untuk GoFood/GrabFood/E-Commerce/Struk Toko: masukkan tiap menu atau produk yang dibeli (abaikan harga coret, ambil harga yang dibayar), dengan quantity (boleh desimal seperti 0.5 atau 1.25 untuk barang timbangan/kg/liter), unitPrice, totalPrice.
    - Untuk perjalanan GoRide/GoCar/GrabBike/GrabCar atau pengiriman GoSend/GrabExpress: masukkan tarif perjalanan/pengiriman sebagai item dengan suggestedType "Transportasi & BBM" atau "Biaya Pengiriman & Kurir".
    - Untuk setiap item, wajib pilih suggestedType dari daftar: ${ITEM_TYPE_SUGGESTIONS.join(", ")}, serta typeReason singkat (3-6 kata).
 6. taxOrService: gabungkan biaya ongkos kirim, biaya aplikasi, biaya jasa platform, biaya layanan, asuransi pengiriman, atau pajak PB1/PPN yang terpisah dari harga barang (0 jika tidak ada).
@@ -108,7 +108,7 @@ Tugas Anda:
 10. paymentMethod: deteksi metode pembayaran dari daftar: ${PAYMENT_METHODS.join(", ")} (misal GoPay, OVO, ShopeePay, QRIS, Transfer Bank / VA, Kartu Debit, Kartu Kredit, Tunai).
 11. notes: ringkasan 1 kalimat singkat tentang transaksi ini.
 
-Pastikan seluruh angka adalah bilangan bulat Rupiah penuh (hilangkan titik/koma pemisah ribuan seperti 25.000 menjadi 25000).`;
+Pastikan seluruh harga dan nominal Rupiah adalah bilangan bulat penuh (hilangkan titik/koma pemisah ribuan seperti 25.000 menjadi 25000), sedangkan quantity boleh berupa bilangan desimal jika tertera di nota.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-4-hydrogen",
@@ -174,7 +174,11 @@ Pastikan seluruh angka adalah bilangan bulat Rupiah penuh (hilangkan titik/koma 
     const parsed = JSON.parse(rawText) as RawGeminiReceipt;
 
     const items = (parsed.items ?? []).map((item) => {
-      const qty = Math.max(1, Number(item.quantity) || 1);
+      const parsedQty = Number(item.quantity);
+      const qty =
+        Number.isFinite(parsedQty) && parsedQty > 0
+          ? Math.round(parsedQty * 1000) / 1000
+          : 1;
       const total = Math.max(0, Math.round(Number(item.totalPrice) || 0));
       const unit =
         Number(item.unitPrice) > 0
@@ -186,7 +190,7 @@ Pastikan seluruh angka adalah bilangan bulat Rupiah penuh (hilangkan titik/koma 
         name: (item.name ?? "Barang Tanpa Nama").trim(),
         quantity: qty,
         unitPrice: unit,
-        totalPrice: total > 0 ? total : unit * qty,
+        totalPrice: total > 0 ? total : Math.round(unit * qty),
         suggestedType: item.suggestedType?.trim() || "Lainnya",
         typeReason: item.typeReason?.trim() || undefined,
       };

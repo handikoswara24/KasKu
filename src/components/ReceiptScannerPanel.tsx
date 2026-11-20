@@ -65,6 +65,7 @@ export function ReceiptScannerPanel({
   const [category, setCategory] = useState<string>("Belanja Harian");
   const [paymentMethod, setPaymentMethod] = useState<string>("QRIS");
   const [items, setItems] = useState<ReceiptItem[]>([]);
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
   const [taxOrService, setTaxOrService] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -195,6 +196,7 @@ export function ReceiptScannerPanel({
       setCategory(data.suggestedCategory || "Belanja Harian");
       setPaymentMethod(data.paymentMethod || "QRIS");
       setItems(data.items || []);
+      setQtyDrafts({});
       setTaxOrService(data.taxOrService || 0);
       setDiscount(data.discount || 0);
       setTotalAmount(data.totalAmount || 0);
@@ -227,18 +229,61 @@ export function ReceiptScannerPanel({
       if (item.id !== id) return item;
       const updated = { ...item, [field]: value };
       if (field === "quantity" || field === "unitPrice") {
-        const qty = Math.max(1, Number(updated.quantity) || 1);
+        const parsedQty = Number(updated.quantity);
+        const qty =
+          Number.isFinite(parsedQty) && parsedQty > 0
+            ? Math.round(parsedQty * 1000) / 1000
+            : item.quantity > 0
+            ? item.quantity
+            : 1;
         const unit = Math.max(0, Number(updated.unitPrice) || 0);
         updated.quantity = qty;
         updated.unitPrice = unit;
-        updated.totalPrice = Math.round(qty * unit);
+        if (unit > 0) {
+          updated.totalPrice = Math.round(qty * unit);
+        }
       } else if (field === "totalPrice") {
-        updated.totalPrice = Math.max(0, Math.round(Number(value) || 0));
+        const nextTotal = Math.max(0, Math.round(Number(value) || 0));
+        updated.totalPrice = nextTotal;
+        const qty = updated.quantity > 0 ? updated.quantity : 1;
+        updated.unitPrice = Math.round(nextTotal / qty);
       }
       return updated;
     });
     setItems(nextItems);
     recalculateTotal(nextItems, taxOrService, discount);
+  };
+
+  const handleQuantityChange = (item: ReceiptItem, rawValue: string) => {
+    const normalized = rawValue.replace(",", ".");
+    if (normalized !== "" && !/^\d*(\.\d*)?$/.test(normalized)) {
+      return;
+    }
+    setQtyDrafts((prev) => ({ ...prev, [item.id]: normalized }));
+
+    if (normalized === "" || normalized.endsWith(".")) {
+      return;
+    }
+
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      updateItemField(item.id, "quantity", parsed);
+    }
+  };
+
+  const handleQuantityBlur = (item: ReceiptItem) => {
+    const draft = qtyDrafts[item.id];
+    if (draft !== undefined) {
+      const parsed = Number(draft);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        updateItemField(item.id, "quantity", parsed);
+      }
+      setQtyDrafts((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    }
   };
 
   const handleAddEmptyItem = () => {
@@ -256,6 +301,11 @@ export function ReceiptScannerPanel({
   const handleRemoveItem = (id: string) => {
     const next = items.filter((item) => item.id !== id);
     setItems(next);
+    setQtyDrafts((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
     recalculateTotal(next, taxOrService, discount);
   };
 
@@ -314,6 +364,7 @@ export function ReceiptScannerPanel({
       );
       setPreviewDataUrl(null);
       setItems([]);
+      setQtyDrafts({});
       setSourcePlatform("Struk Toko");
       setServiceLabel("");
       setMerchantName("");
@@ -810,19 +861,16 @@ export function ReceiptScannerPanel({
                             <div className="col-span-1 sm:col-span-2">
                               <label className="sr-only">Jumlah</label>
                               <input
-                                type="number"
-                                inputMode="numeric"
-                                min={1}
-                                value={item.quantity}
+                                type="text"
+                                inputMode="decimal"
+                                value={qtyDrafts[item.id] ?? String(item.quantity)}
                                 onChange={(e) =>
-                                  updateItemField(
-                                    item.id,
-                                    "quantity",
-                                    Number(e.target.value)
-                                  )
+                                  handleQuantityChange(item, e.target.value)
                                 }
+                                onBlur={() => handleQuantityBlur(item)}
+                                placeholder="1"
                                 className="w-full min-h-[42px] px-2.5 py-1.5 text-base sm:text-sm font-mono tabular-nums border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-600"
-                                title="Jumlah"
+                                title="Jumlah (boleh desimal, mis. 0.5 atau 1.25)"
                               />
                             </div>
                             <div className="col-span-1 sm:col-span-4">
